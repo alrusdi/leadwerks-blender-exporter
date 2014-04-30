@@ -121,5 +121,4 @@ class Surface(Node):
             stream.write_int(self.count_triangles()*3)
             stream.write_int(constants.MDL_TRIANGLES)
             stream.write_int(constants.MDL_UNSIGNED_SHORT)
-            stream.write_int(4)  # num elements
-            stream.write_batch('H', self.bone_weights)
+            stream.write_batch('H', self.indexes)
