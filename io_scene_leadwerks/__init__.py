@@ -34,7 +34,6 @@ if "bpy" in locals():
     if "export_leadwerks" in locals():
         imp.reload(export_leadwerks)
 
-
 import bpy
 from bpy.props import (StringProperty,
                        BoolProperty,
@@ -42,8 +41,7 @@ from bpy.props import (StringProperty,
                        EnumProperty,
                        )
 
-from bpy_extras.io_utils import (ExportHelper,
-                                 )
+from bpy_extras.io_utils import ExportHelper
 
 class ExportLeadwerks(bpy.types.Operator, ExportHelper):
     bl_idname = "export_scene.mdl"
