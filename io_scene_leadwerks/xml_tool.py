@@ -64,7 +64,7 @@ class MdlCompiller(object):
 
     def get_value(self, node, name):
         node = self.get_subnode_by_name(node, name)
-        return self.get_subnode_by_name('value').text
+        return self.get_subnode_by_name(node, 'value').text
 
 
     def header_compiller(self, node):
@@ -101,10 +101,10 @@ class MdlCompiller(object):
 
 
     def mesh_compiller(self, node):
-        self._matrix_compiller(constants.MDL_MESH)
+        self._matrix_compiller(node, constants.MDL_MESH)
 
     def node_compiller(self, node):
-        self._matrix_compiller(constants.MDL_NODE)
+        self._matrix_compiller(node, constants.MDL_NODE)
 
     def props_compiller(self, node):
         size, props = self._parse_props(node)
@@ -138,6 +138,7 @@ class MdlCompiller(object):
             [
                 constants.MDL_SURFACE,
                 self.count_subnodes(node),  # kids count
+                0
             ]
         )
 
@@ -148,10 +149,10 @@ class MdlCompiller(object):
             [
                 constants.MDL_VERTEXARRAY,
                 self.count_subnodes(node),  # kids count
-                48,  # block size
+                data['count'] * 3 * 4 + 4 * 4,  # block size
                 data['type'],  # type of data
                 int(self.get_value(node, 'variable_type')),
-                int(self.get_subnode_by_name('number_of_vertices').text),
+                int(self.get_subnode_by_name(node, 'number_of_vertices').text),
                 data['count'],  # elements
             ]
         )
@@ -161,15 +162,15 @@ class MdlCompiller(object):
     def indices_compiller(self, node):
         data = self.get_subnode_by_name(node, 'data').text
         data = self._parse_list(data, int)
-
+        ct = len(data)
         self.writer.write_batch(
             'I',
             [
                 constants.MDL_INDICEARRAY,
                 self.count_subnodes(node),  # kids count
-                18,  # block size
-                len(data), # indexes count
-                int(self.get_subnode_by_name('primitive_type').text),
+                ct * 2 + 3 * 4,  # block size
+                ct, # indexes count
+                int(self.get_subnode_by_name(node, 'primitive_type').text),
                 int(self.get_value(node, 'variable_type'))
             ]
         )
@@ -181,14 +182,14 @@ class MdlCompiller(object):
         self.writer.write_int(int(self.get_value(node, 'bone_id')))
 
     def anim_compiller(self, node):
-        frames_list = self.get_subnode_by_name('frames')
+        frames_list = self.get_subnode_by_name(node, 'frames')
         ct = len(frames_list)
         self.writer.write_batch(
             'I',
             [
                 constants.MDL_ANIMATIONKEYS,
                 self.count_subnodes(node),  # kids count
-                ct*64+4,  # block size
+                ct*64 + 4,  # block size
                 ct,
                 int(self.get_value(node, 'variable_type'))
             ]
