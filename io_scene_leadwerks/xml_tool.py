@@ -24,7 +24,6 @@ class MdlCompiller(object):
     def compile_node(self, node):
         code = node.attrib.get('code')
         compile = self.get_node_compiller(code)
-
         if not compile:
             raise NotImplementedError('Compiller not found for code %s' % code)
 
@@ -108,7 +107,6 @@ class MdlCompiller(object):
 
     def props_compiller(self, node):
         size, props = self._parse_props(node)
-
         self.writer.write_batch(
             'I',
             [
@@ -144,13 +142,14 @@ class MdlCompiller(object):
 
     def vertex_compiller(self, node):
         data = self._parse_vertex_data(node)
+        verts_count = int(self.get_subnode_by_name(node, 'number_of_vertices').text)
         self.writer.write_batch(
             'I',
             [
                 constants.MDL_VERTEXARRAY,
                 self.count_subnodes(node),  # kids count
-                data['count'] * 3 * 4 + 4 * 4,  # block size
-                int(self.get_subnode_by_name(node, 'number_of_vertices').text), # number_of_vertices
+                verts_count * 3 * 4 + 4 * 4,  # block size
+                verts_count,  # number_of_vertices
                 data['type'],  # type of data
                 int(self.get_value(node, 'variable_type')),
                 data['count'],  # elements
@@ -179,10 +178,11 @@ class MdlCompiller(object):
 
     def bone_compiller(self, node):
         self._matrix_compiller(node, constants.MDL_BONE)
-        self.writer.write_int(int(self.get_value(node, 'bone_id')))
+        self.writer.write_int(int(self.get_subnode_by_name(node, 'bone_id').text))
 
     def anim_compiller(self, node):
-        frames_list = self.get_subnode_by_name(node, 'frames')
+        frames_subnode = self.get_subnode_by_name(node, 'frames')
+        frames_list = frames_subnode if not frames_subnode is None else []
         ct = len(frames_list)
         self.writer.write_batch(
             'I',
@@ -190,8 +190,7 @@ class MdlCompiller(object):
                 constants.MDL_ANIMATIONKEYS,
                 self.count_subnodes(node),  # kids count
                 ct*64 + 4,  # block size
-                ct,
-                int(self.get_value(node, 'variable_type'))
+                ct
             ]
         )
         for f in frames_list:
@@ -235,7 +234,8 @@ class MdlDumper(object):
         header = OrderedDict({
             'code': node_code,
             'num_kids': self.reader.read_int(),
-            '_block_size': self.reader.read_int()
+            '_block_size': self.reader.read_int(),
+            '_offset': self.reader.cur_pos(),
         })
 
         reader = self.get_node_reader(node_code)
@@ -388,14 +388,14 @@ class MdlDumper(object):
 
     def __convert_node_to_xml(self, node):
         xml = '<node'
-        for k in ['name', '_num_kids', '_block_size', 'code']:
+        for k in ['name', '_num_kids', '_block_size', '_offset', 'code']:
             v = node.get(k)
             if v:
                 xml = '%s %s="%s"' % (xml, k, v)
         xml = '%s>' % xml
 
         for k, v in node.items():
-            if k in ['name', 'nodes', '_num_kids', '_block_size', 'code']:
+            if k in ['name', 'nodes', '_num_kids', '_block_size', '_offset', 'code']:
                 continue
             if type(v) is list:
                 if not v:

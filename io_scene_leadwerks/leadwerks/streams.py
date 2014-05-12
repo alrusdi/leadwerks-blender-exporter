@@ -58,7 +58,7 @@ class BinaryStreamReader(BinaryStream):
             if ct:
                 if i == ct:
                     return str(res)
-            elif not ord(s):
+            elif c == b'\x00':
                 return res[0:-1]
         return res
 
