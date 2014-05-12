@@ -150,9 +150,9 @@ class MdlCompiller(object):
                 constants.MDL_VERTEXARRAY,
                 self.count_subnodes(node),  # kids count
                 data['count'] * 3 * 4 + 4 * 4,  # block size
+                int(self.get_subnode_by_name(node, 'number_of_vertices').text), # number_of_vertices
                 data['type'],  # type of data
                 int(self.get_value(node, 'variable_type')),
-                int(self.get_subnode_by_name(node, 'number_of_vertices').text),
                 data['count'],  # elements
             ]
         )
@@ -169,7 +169,7 @@ class MdlCompiller(object):
                 constants.MDL_INDICEARRAY,
                 self.count_subnodes(node),  # kids count
                 ct * 2 + 3 * 4,  # block size
-                ct, # indexes count
+                ct,  # indexes count
                 int(self.get_subnode_by_name(node, 'primitive_type').text),
                 int(self.get_value(node, 'variable_type'))
             ]
@@ -289,7 +289,6 @@ class MdlDumper(object):
         return {'name': data_type_map.get(str(dt), 'UNKNOWN'), 'value': dt}
 
 
-
     def mesh_reader(self):
         ret = {
             'name': 'MESH',
@@ -311,11 +310,10 @@ class MdlDumper(object):
 
     def props_reader(self):
         count = self.reader.read_int()
-        ret = {
-            'name': 'PROPERTIES',
-            'count': count,
-            'properties': []
-        }
+        ret = OrderedDict()
+        ret['name'] = 'PROPERTIES'
+        ret['count'] = count
+        ret['properties'] = []
 
         for i in range(0, count):
             ret['properties'].append({
