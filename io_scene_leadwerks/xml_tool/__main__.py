@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Tool to decompile .mdl files to custom XML format for debugging purpose
-and compile back again.
+Tool for dumping .mdl files into custom XML format for debugging purposes.
+It also can compile .xml to .mdl again.
 Usage:
 python3 -m xml_tool whatever.mdl whatever.mod.xml
 python3 -m xml_tool whatever.mod.xml whatever.new.mdl

@@ -77,7 +77,7 @@ class MdlCompiler(object):
             ret.append(convert_fn(mv.strip()))
         return ret
 
-    def _matrix_compiler(self, node, node_code):
+    def _matrix_compiler(self, node, node_code, block_size=64):
         matrix = self.get_subnode_by_name(node, 'matrix').text
         matrix = self._parse_list(matrix, float)
 
@@ -86,7 +86,7 @@ class MdlCompiler(object):
             [
                 node_code,
                 self.count_subnodes(node),  # kids count
-                64,  # block size
+                block_size,  # block size
             ]
         )
 
@@ -135,21 +135,47 @@ class MdlCompiler(object):
 
     def vertex_compiler(self, node):
         data = self._parse_vertex_data(node)
-        verts_count = int(self.get_subnode_by_name(node, 'number_of_vertices').text)
+
         self.writer.write_batch(
             'I',
             [
                 constants.MDL_VERTEXARRAY,
                 self.count_subnodes(node),  # kids count
-                verts_count * 3 * 4 + 4 * 4,  # block size
-                verts_count,  # number_of_vertices
+                data['block_size'],  # block size
+                data['verts_count'],  # number_of_vertices
                 data['type'],  # type of data
                 int(self.get_value(node, 'variable_type')),
                 data['count'],  # elements
             ]
         )
 
-        self.writer.write_batch('f', data['items'])
+        self.writer.write_batch(data['mod'], data['items'])
+
+    def _parse_vertex_data(self, node):
+        data_type = int(self.get_value(node, 'data_type'))
+        verts_count = int(self.get_subnode_by_name(node, 'number_of_vertices').text)
+        elements_count = 3
+        el_sz = 4
+        cvt_fn = float
+        mod = 'f'
+        if data_type == constants.MDL_TEXTURE_COORD:
+            elements_count = 2
+        elif data_type in [constants.MDL_BONEINDICE, constants.MDL_BONEWEIGHT, constants.MDL_COLOR]:
+            elements_count = 4
+            el_sz = 1
+            cvt_fn = int
+            mod = 'B'
+
+        data = self.get_subnode_by_name(node, 'data').text
+        data = self._parse_list(data, cvt_fn)
+        return {
+            'count': elements_count,
+            'type': data_type,
+            'items': data,
+            'block_size': verts_count * elements_count * el_sz + 4 * 4,
+            'verts_count': verts_count,
+            'mod': mod
+        }
 
     def indices_compiler(self, node):
         data = self.get_subnode_by_name(node, 'data').text
@@ -170,7 +196,7 @@ class MdlCompiler(object):
         self.writer.write_batch('H', data)
 
     def bone_compiler(self, node):
-        self._matrix_compiler(node, constants.MDL_BONE)
+        self._matrix_compiler(node, constants.MDL_BONE, block_size=68)
         self.writer.write_int(int(self.get_subnode_by_name(node, 'bone_id').text))
 
     def anim_compiler(self, node):
@@ -190,14 +216,3 @@ class MdlCompiler(object):
             data = f.text
             data = self._parse_list(data, float)
             self.writer.write_batch('f', data)
-
-    def _parse_vertex_data(self, node):
-        data_type = int(self.get_value(node, 'data_type'))
-        elements_count = 2 if data_type == constants.MDL_TEXTURE_COORD else 3
-        data = self.get_subnode_by_name(node, 'data').text
-        data = self._parse_list(data, float)
-        return {
-            'count': elements_count,
-            'type': data_type,
-            'items': data
-        }
