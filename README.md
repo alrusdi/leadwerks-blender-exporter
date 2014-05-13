@@ -1,7 +1,7 @@
 Leadwerks Blender exporter
 ==========================
 
-Exporer for geometry, materaials, physics data from Blender to Leadwerks game engine
+Exporter for geometry, materaials, physics data from Blender to Leadwerks game engine
 
 Installation
 ==========================
