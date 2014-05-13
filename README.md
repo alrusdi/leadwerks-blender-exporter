@@ -20,6 +20,6 @@ How to participate
 ==========================
 1. Clone this repository
 2. Make branch with proper name reflecting your changes
-3. Implement needed features or fix annoing bugs
+3. Implement needed features or fix annoying bugs
 5. Commit and push the changes into your branch
 6. Make pull request and we will merge your changes with main repository if everything ok
