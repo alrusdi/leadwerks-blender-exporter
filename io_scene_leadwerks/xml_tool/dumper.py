@@ -4,6 +4,7 @@ from collections import OrderedDict
 import sys
 from leadwerks.mdl import constants
 from leadwerks import streams
+from lxml import etree
 
 
 class MdlDumper(object):
@@ -224,7 +225,10 @@ class MdlDumper(object):
             xml = '%s</subblocks>' % xml
 
         xml = '%s</block>' % xml
-        return xml
+
+        parser = etree.XMLParser(remove_blank_text=True)
+        tree = etree.fromstring(xml, parser)
+        return etree.tostring(tree, pretty_print=True).decode(encoding='UTF-8')
 
     def __fmt_kv(self, v):
         """
