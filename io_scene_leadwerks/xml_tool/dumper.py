@@ -4,8 +4,7 @@ from collections import OrderedDict
 import sys
 from leadwerks.mdl import constants
 from leadwerks import streams
-from lxml import etree
-
+from xml.dom import minidom
 
 class MdlDumper(object):
     def __init__(self, path):
@@ -180,18 +179,20 @@ class MdlDumper(object):
         return ret
 
     def as_xml(self):
-        return self.__convert_node_to_xml(self.data)
+        out = self.__convert_node_to_xml(self.data)
+        doc = minidom.parseString(out)
+        return doc.toprettyxml()
 
     def __convert_node_to_xml(self, node):
         # list of parameters displayed as xml attributes of block
         attrs = ['name', '_num_kids', '_block_size', '_offset', 'code']
 
-        xml = '<block'
+        out = '<block'
         for k in attrs:
             v = node.get(k)
             if v:
-                xml = '%s %s="%s"' % (xml, k, v)
-        xml = '%s>' % xml
+                out = '%s %s="%s"' % (out, k, v)
+        out = '%s>' % out
 
         for k, v in node.items():
             if k == 'blocks' or k in attrs:
@@ -215,20 +216,17 @@ class MdlDumper(object):
                 v = res
             elif type(v) is dict or type(v) is OrderedDict:
                 v = self.__fmt_kv(v)
-            xml = '%s<%s>%s</%s>' % (xml, k, v, k)
+            out = '%s<%s>%s</%s>' % (out, k, v, k)
 
         # recursive calls to add children blocks
         if node.get('blocks'):
-            xml = '%s<subblocks>' % xml
+            out = '%s<subblocks>' % out
             for n in node['blocks']:
-                xml = '%s%s' % (xml, self.__convert_node_to_xml(n))
-            xml = '%s</subblocks>' % xml
+                out = '%s%s' % (out, self.__convert_node_to_xml(n))
+            out = '%s</subblocks>' % out
 
-        xml = '%s</block>' % xml
-
-        parser = etree.XMLParser(remove_blank_text=True)
-        tree = etree.fromstring(xml, parser)
-        return etree.tostring(tree, pretty_print=True).decode(encoding='UTF-8')
+        out = '%s</block>' % out
+        return out
 
     def __fmt_kv(self, v):
         """
