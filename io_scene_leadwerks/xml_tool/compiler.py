@@ -2,13 +2,13 @@
 
 from . import streams
 from leadwerks.mdl import constants
-from lxml import etree
+import xml.etree.ElementTree as ET
 
 
 class MdlCompiler(object):
     def __init__(self, path, output_path):
         with open(path, 'r') as f:
-            self.source = etree.fromstring(f.read())
+            self.source = ET.fromstring(f.read())
 
         self.writer = streams.BinaryStreamWriter(output_path)
         self.writer.open()
