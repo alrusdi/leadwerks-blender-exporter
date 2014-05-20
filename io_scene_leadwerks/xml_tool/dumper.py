@@ -103,7 +103,7 @@ class MdlDumper(object):
             'name': 'FILE',
             'version': self.reader.read_int()
         }
-        self.MODEL_VERSION  = ret['version']
+        self.FILE_FORMAT_VERSION = ret['version']
         return ret
 
     def props_reader(self):
@@ -140,7 +140,6 @@ class MdlDumper(object):
             mod,
             ret['elements_count'] * ret['number_of_vertices']
         )
-
         return ret
 
     def indices_reader(self):

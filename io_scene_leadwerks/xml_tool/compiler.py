@@ -171,7 +171,7 @@ class MdlCompiler(object):
 
         data = self.get_subnode_by_name(node, 'data').text
         data = self._parse_list(data, cvt_fn)
-        return {
+        ret = {
             'count': elements_count,
             'type': data_type,
             'items': data,
@@ -179,6 +179,7 @@ class MdlCompiler(object):
             'verts_count': verts_count,
             'mod': mod
         }
+        return ret
 
     def indices_compiler(self, node):
         data = self.get_subnode_by_name(node, 'data').text
