@@ -3,7 +3,7 @@
 from collections import OrderedDict
 import sys
 from leadwerks.mdl import constants
-from leadwerks import streams
+from . import streams
 from lxml import etree
 
 

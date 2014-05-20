@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from leadwerks import streams
+from . import streams
 from leadwerks.mdl import constants
 from lxml import etree
 
