@@ -13,6 +13,7 @@ class MdlDumper(object):
         self.reader = streams.BinaryStreamReader(path)
         self.reader.open()
         self.data = OrderedDict()
+        self.FILE_FORMAT_VERSION = constants.MDL_VERSION
 
     def read(self):
         self.data = self.read_node()
@@ -35,7 +36,6 @@ class MdlDumper(object):
             '_block_size': self.reader.read_int(),
             '_offset': self.reader.cur_pos(),
         })
-
         reader = self.get_node_reader(node_code)
         if not reader:
             print('ERROR! Block reader not found:', node_code)
@@ -103,6 +103,7 @@ class MdlDumper(object):
             'name': 'FILE',
             'version': self.reader.read_int()
         }
+        self.MODEL_VERSION  = ret['version']
         return ret
 
     def props_reader(self):
@@ -177,6 +178,10 @@ class MdlDumper(object):
             ret['frames'].append(
                 self.reader.read_batch('f', 16)
             )
+
+        # In version 2 animation name is added
+        if self.FILE_FORMAT_VERSION == 2:
+            ret['animation_name'] = self.reader.read_nt_str()
 
         return ret
 

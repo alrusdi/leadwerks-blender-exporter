@@ -12,6 +12,7 @@ class MdlCompiler(object):
 
         self.writer = streams.BinaryStreamWriter(output_path)
         self.writer.open()
+        self.FILE_FORMAT_VERSION = constants.MDL_VERSION
 
     def compile(self):
         self.compile_node(self.source)
@@ -61,13 +62,15 @@ class MdlCompiler(object):
         return self.get_subnode_by_name(node, 'value').text
 
     def header_compiler(self, node):
+        v = int(self.get_subnode_by_name(node, 'version').text)
+        self.FILE_FORMAT_VERSION = v
         self.writer.write_batch(
             'I',
             [
                 constants.MDL_FILE,
                 1,  # kids count
                 4,  # block size
-                constants.MDL_VERSION
+                v   # version
             ]
         )
 
@@ -203,12 +206,18 @@ class MdlCompiler(object):
         frames_subnode = self.get_subnode_by_name(node, 'frames')
         frames_list = frames_subnode if not frames_subnode is None else []
         ct = len(frames_list)
+
+        sz = ct*64 + 4
+        if self.FILE_FORMAT_VERSION == 2:
+            anim_name = self.get_subnode_by_name(node, 'animation_name').text
+            sz = len(anim_name) + 1
+
         self.writer.write_batch(
             'I',
             [
                 constants.MDL_ANIMATIONKEYS,
                 self.count_subnodes(node),  # kids count
-                ct*64 + 4,  # block size
+                sz,  # block size
                 ct
             ]
         )
@@ -216,3 +225,6 @@ class MdlCompiler(object):
             data = f.text
             data = self._parse_list(data, float)
             self.writer.write_batch('f', data)
+
+        if self.FILE_FORMAT_VERSION == 2:
+            self.writer.write_nt_str(anim_name)
