@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 
 from . import streams
-from leadwerks.mdl import constants
+from io_scene_leadwerks.leadwerks.mdl import constants
 import xml.etree.ElementTree as ET
 
 
 class MdlCompiler(object):
-    def __init__(self, path, output_path):
-        with open(path, 'r') as f:
-            self.source = ET.fromstring(f.read())
+    def __init__(self, path_or_xml, output_path):
+        if path_or_xml.startswith('<'):
+            _xml = path_or_xml
+        else:
+            with open(path_or_xml, 'r') as f:
+                _xml = f.read()
+
+        self.source = ET.fromstring(_xml)
 
         self.writer = streams.BinaryStreamWriter(output_path)
         self.writer.open()

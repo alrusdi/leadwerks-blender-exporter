@@ -17,14 +17,14 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
-from collections import OrderedDict
 
+from xml.dom import minidom
 import bpy
 import bmesh
-import math
-import time
 from bpy_extras.io_utils import axis_conversion
-from leadwerks.mdl import constants
+from .leadwerks.mdl import constants
+from .xml_tool import compiler
+from mathutils import Vector, Matrix
 
 
 class LeadwerksExporter(object):
@@ -32,10 +32,9 @@ class LeadwerksExporter(object):
     def __init__(self, **kwargs):
         # Changes Blender to "object" mode
         bpy.ops.object.mode_set(mode='OBJECT')
-
         self.options = kwargs
         self.context = kwargs.get('context')
-        self.cvt_matrix = axis_conversion(from_forward='-X', from_up='-Z').to_4x4()
+        self.cvt_matrix = self.get_conversion_matrix()
         self.out_xml = ''
         self.meshes = []
 
@@ -51,8 +50,33 @@ class LeadwerksExporter(object):
                 self.append(self.format_mesh(e))
 
         self.append('</subblocks></block>')
-        print(self.out_xml)
+
+        doc = minidom.parseString(self.out_xml)
+        self.out_xml = doc.toprettyxml()
+
+        out_path = self.options['filepath']
+
+        print(out_path)
+        with open('%s.xml' % out_path, 'w') as f:
+            f.write(self.out_xml)
+
+        cc = compiler.MdlCompiler(self.out_xml, out_path)
+        cc.compile()
+
         return {'FINISHED'}
+
+    def get_conversion_matrix(self):
+        cvt_matrix = axis_conversion(
+            from_forward='X',
+            to_forward='-Z',
+            from_up='Z',
+            to_up='-Y'
+        ).to_4x4()
+
+        mirror_z = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
+
+        return cvt_matrix * mirror_z
+
 
     def get_header(self):
         return '<block name="FILE" code="1"><num_kids>1</num_kids><version>2</version><subblocks>'
@@ -118,6 +142,8 @@ class LeadwerksExporter(object):
             })
 
         mesh = self.triangulate_mesh(mesh)
+        mesh.transform(self.cvt_matrix)
+        mesh.calc_normals()
 
         verts = {}
         for vert in mesh.vertices:
@@ -150,11 +176,13 @@ class LeadwerksExporter(object):
 
             faces_map[k].append({
                 'material_index': face.material_index,
-                'vertex_indices': f_verts,
+                'vertex_indices': reversed(f_verts),
                 'texture_coords': face_tex_coords
             })
 
         #from pprint import pprint
+        #pprint(verts)
+        #print('-'*10)
         #pprint(faces_map)
         surfaces = []
 
@@ -187,15 +215,15 @@ class LeadwerksExporter(object):
                                 tc[ct+1] = itc[1]
                                 ct += 2
                         texture_coords.extend(tc)
+                        orig_vert = verts.get(str(v))
+                        vertices.extend(orig_vert['position'])
+                        normals.extend(orig_vert['normals'])
 
                     indices.append(idx)
             vert_ids = list(set(map(int, vertices_map.keys())))
             vert_ids.sort()
 
             for vert_id in map(str, vert_ids):
-                data = verts.get(vert_id)
-                vertices.extend(data['position'])
-                normals.extend(data['normals'])
                 bone_weights.extend([0,0,0,0])
                 bone_indexes.extend([0,0,0,0])
                 tangents.extend([0.0]*3)
@@ -203,7 +231,7 @@ class LeadwerksExporter(object):
 
             try:
                 mat = materials[int(mat_idx)+1]
-            except ValueError:
+            except IndexError:
                 mat = materials[0]
             surfaces.append({
                 'material': mat,
@@ -217,7 +245,7 @@ class LeadwerksExporter(object):
                 'bone_indexes': bone_indexes,
 
             })
-        #pprint(surfaces)
+        #print(surfaces)
         return surfaces
 
     def format_floats(self, floats):
@@ -230,7 +258,7 @@ class LeadwerksExporter(object):
         ret = '<block name="SURFACE" code="%s">' % constants.MDL_SURFACE
         ret += '<num_kids>7</num_kids>'
         ret += '<subblocks>'
-        ret += self.format_props([['material', 'default.mat']])
+        ret += self.format_props([['material', 'green']])
 
         vcount = int(len(surface['vertices'])/3)
 
@@ -344,6 +372,5 @@ class LeadwerksExporter(object):
         bm.free()
 
         mesh.update(calc_tessface=True, calc_edges=True)
-        mesh.calc_normals()
 
         return mesh
