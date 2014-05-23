@@ -17,17 +17,21 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
+from copy import copy
+import os
 
 from xml.dom import minidom
 import bpy
 import bmesh
 from bpy_extras.io_utils import axis_conversion
+import subprocess
 from .leadwerks.mdl import constants
 from .xml_tool import compiler
 from mathutils import Vector, Matrix
 
 
 class LeadwerksExporter(object):
+    FLOAT_EPSILON = 0.000000001
 
     def __init__(self, **kwargs):
         # Changes Blender to "object" mode
@@ -37,6 +41,7 @@ class LeadwerksExporter(object):
         self.cvt_matrix = self.get_conversion_matrix()
         self.out_xml = ''
         self.meshes = []
+        self.materials = {}
 
     def export(self):
         '''
@@ -56,12 +61,51 @@ class LeadwerksExporter(object):
 
         out_path = self.options['filepath']
 
-        print(out_path)
         with open('%s.xml' % out_path, 'w') as f:
             f.write(self.out_xml)
 
         cc = compiler.MdlCompiler(self.out_xml, out_path)
         cc.compile()
+
+        textures = []
+        for m in self.materials.values():
+            dir = os.path.dirname(out_path)
+            fname = os.path.join(dir, '%s.mat' % m['name'])
+            bd = m['blender_data']
+            out = '''//Leadwerks Material File
+            blendmode=0
+            castshadows=1
+            zsort=0
+            cullbackfaces=1
+            depthtest=1
+            depthmask=1
+            alwaysuseshader=0
+            drawmode=-1
+            shader="Shaders/Model/diffuse.shader"
+            '''
+
+            out += 'diffuse: %s\n' % ','.join(['%.9f' % c for c in list(bd.diffuse_color)])
+            out += 'specular: %s\n' % ','.join(['%.9f' % c for c in list(bd.specular_color)])
+
+            for i, ts in enumerate(bd.texture_slots):
+                try:
+                    texture_name = ts.name.lower()
+                    i = ts.texture.image
+                    i.filepath_raw = os.path.join(dir, '%s.png' % texture_name)
+                    i.file_format = 'PNG'
+                    i.save()
+                    textures.append(i.filepath_raw)
+                    out += 'texture%s="./%s.tex"' % (i, texture_name)
+                except:
+                    pass
+            with open(fname, 'w') as f:
+                f.write(out.replace('    ', ''))
+
+        for t in textures:
+            subprocess.call(
+                '/home/alrusdi/dev/Leadwerks/Tools/img2tex.linux "%s"' % t,
+                shell=True
+            )
 
         return {'FINISHED'}
 
@@ -126,19 +170,22 @@ class LeadwerksExporter(object):
         ret += '</block>'
         return ret
 
+    def to_str_list(self, floats_list):
+        return ['%.9f' % f for f in floats_list]
+
     def get_surfaces(self, mesh):
         '''
-        Split the single mesh by used materials into list of surfaces
+        Split the single mesh into list of surfaces by materials
         '''
         materials = [
-            {'index': 'None', 'name': 'default.mat', 'material': None}
+            {'index': None, 'name': 'default', 'material': None}
         ]
 
         for idx, m in enumerate(mesh.data.materials):
             materials.append({
                 'index': idx,
-                'name': '',
-                'material': m
+                'name': '%s_%s' % (mesh.name.lower(), m.name.lower()),
+                'blender_data': m
             })
 
         mesh = self.triangulate_mesh(mesh)
@@ -148,42 +195,62 @@ class LeadwerksExporter(object):
         verts = {}
         for vert in mesh.vertices:
             verts[str(vert.index)] = {
-                'position': list(vert.co),
-                'normals': [vert.normal.x, vert.normal.y, vert.normal.z]
+                'position': self.to_str_list(list(vert.co)),
+                'normals': self.to_str_list(
+                    [vert.normal.x, vert.normal.y, vert.normal.z]
+                )
             }
 
+        tcoords = {}
+        for l in mesh.tessface_uv_textures:
+            for face_idx, coords in l.data.items():
+                tcoords[str(face_idx)] = [
+                    self.to_str_list(list(coords.uv1)),
+                    self.to_str_list(list(coords.uv2)),
+                    self.to_str_list(list(coords.uv3)),
+                ]
+            break
+
         faces_map = {}
-        for face in mesh.tessfaces:
+        total = len(mesh.tessfaces)
+        verts_by_tc = {}
+        for i, face in enumerate(mesh.tessfaces):
             idx = face.index
             k = str(face.material_index)
 
             if not k in faces_map:
                 faces_map[k] = []
 
-            f_verts = list(face.vertices)
+            f_verts = list(map(str, list(face.vertices)))
 
-            face_tex_coords = []
-            for l in mesh.tessface_uv_textures:
-                for face_idx, coords in l.data.items():
-                    if face_idx != idx:
+            coords = tcoords.get(str(idx))
+
+            for vpos, vert_idx in enumerate(f_verts):
+                icoords = coords[vpos]
+                hash = '%s_%s' % (vert_idx, '_'.join(icoords))
+
+                v = verts.get(vert_idx)
+                if v.get('texture_coords'):
+                    hash = '%s_%s' % (vert_idx, '_'.join(coords[vpos]))
+                    if verts_by_tc.get(hash):
                         continue
-                    # face.loop_indices[vertex] ?
-                    face_tex_coords.append({
-                       str(f_verts[0]): list(coords.uv[0]),
-                       str(f_verts[1]): list(coords.uv[1]),
-                       str(f_verts[2]): list(coords.uv[2])
-                    })
+
+                    new_vert = copy(v)
+                    new_vert['texture_coords'] = icoords
+                    new_idx = str(len(verts.keys()))
+                    new_hash = '%s_%s' % (new_idx, '_'.join(icoords))
+                    verts_by_tc[new_hash] = new_idx
+                    verts[new_idx] = new_vert
+                    f_verts[vpos] = new_idx
+                else:
+                    verts_by_tc[hash] = vert_idx
+                    verts[vert_idx]['texture_coords'] =icoords
 
             faces_map[k].append({
                 'material_index': face.material_index,
-                'vertex_indices': reversed(f_verts),
-                'texture_coords': face_tex_coords
+                'vertex_indices': list(reversed(f_verts)),
             })
 
-        #from pprint import pprint
-        #pprint(verts)
-        #print('-'*10)
-        #pprint(faces_map)
         surfaces = []
 
         for mat_idx, surface_data in faces_map.items():
@@ -202,19 +269,12 @@ class LeadwerksExporter(object):
                 for v in face['vertex_indices']:
                     idx = vertices_map.get(str(v))
                     if idx is None:
+                        real_vert = verts[v]
                         idx = len(vertices_map.values())
                         vertices_map[str(v)] = idx
 
                         # Distributing texture coordinates
-                        tc = [0.0] * 2
-                        ct = 0
-                        for i, itc in enumerate(face['texture_coords']):
-                            itc = itc.get(str(v), [0.0]*2)
-                            if i < 1:
-                                tc[ct] = itc[0]
-                                tc[ct+1] = itc[1]
-                                ct += 2
-                        texture_coords.extend(tc)
+                        texture_coords.extend(real_vert.get('texture_coords', ['0.0', '0.0']))
                         orig_vert = verts.get(str(v))
                         vertices.extend(orig_vert['position'])
                         normals.extend(orig_vert['normals'])
@@ -226,8 +286,8 @@ class LeadwerksExporter(object):
             for vert_id in map(str, vert_ids):
                 bone_weights.extend([0,0,0,0])
                 bone_indexes.extend([0,0,0,0])
-                tangents.extend([0.0]*3)
-                binormals.extend([0.0]*3)
+                tangents.extend(['0.0']*3)
+                binormals.extend(['0.0']*3)
 
             try:
                 mat = materials[int(mat_idx)+1]
@@ -245,11 +305,19 @@ class LeadwerksExporter(object):
                 'bone_indexes': bone_indexes,
 
             })
-        #print(surfaces)
+
+        for s in surfaces:
+            m = s['material']
+            if m['index'] is None:
+                continue
+
+            bd = m['blender_data']
+            self.materials[bd] = m
+
         return surfaces
 
     def format_floats(self, floats):
-        return ','.join('%f' % f for f in floats)
+        return ','.join(floats)
 
     def format_ints(self, ints):
         return ','.join('%s' % i for i in ints)
@@ -372,5 +440,4 @@ class LeadwerksExporter(object):
         bm.free()
 
         mesh.update(calc_tessface=True, calc_edges=True)
-
         return mesh
