@@ -1,21 +1,3 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
 # <pep8 compliant>
 from copy import copy
 import os
@@ -25,123 +7,178 @@ import bpy
 import bmesh
 from bpy_extras.io_utils import axis_conversion
 import subprocess
-from .leadwerks.mdl import constants
-from .xml_tool import compiler
+import mathutils
+from leadwerks.mdl import constants
+from material import Material
+from xml_tool import compiler
 from mathutils import Vector, Matrix
 
 
 class LeadwerksExporter(object):
-    FLOAT_EPSILON = 0.000000001
+    FLOAT_EPSILON = 0.0000000001
 
     def __init__(self, **kwargs):
         # Changes Blender to "object" mode
-        bpy.ops.object.mode_set(mode='OBJECT')
+        # bpy.ops.object.mode_set(mode='OBJECT')
         self.options = kwargs
         self.context = kwargs.get('context')
         self.cvt_matrix = self.get_conversion_matrix()
-        self.out_xml = ''
-        self.meshes = []
         self.materials = {}
 
     def export(self):
         '''
         Entry point
         '''
-        self.append(self.get_header())
+
 
         exportables = self.get_exportables()
+
         for e in exportables:
-            if e.type == 'MESH':
-                self.append(self.format_mesh(e))
+            name = None
+            if len(exportables) > 1:
+                wanted_name = os.path.basename(self.options['filepath'])
+                wanted_name = wanted_name[0:-4]
+                name = '%s_%s' % (wanted_name, e['object'].name.lower())
+            self.save_exportable(e, name)
 
-        self.append('</subblocks></block>')
+        self.export_materials()
+        return {'FINISHED'}
 
-        doc = minidom.parseString(self.out_xml)
-        self.out_xml = doc.toprettyxml()
+    def save_exportable(self, e, name=None):
+        res = self.get_header()
+        res += self.format_block(e, is_topmost=True)
+        res += '</subblocks></block>'
 
         out_path = self.options['filepath']
+        if name:
+            out_path = os.path.join(os.path.dirname(out_path), '%s.mdl' % name)
+
+        doc = minidom.parseString(res)
+        res = doc.toprettyxml()
 
         with open('%s.xml' % out_path, 'w') as f:
-            f.write(self.out_xml)
+            f.write(res)
 
-        cc = compiler.MdlCompiler(self.out_xml, out_path)
+        cc = compiler.MdlCompiler(res, out_path)
         cc.compile()
 
+    def get_topmost_matrix(self, exportable):
+        mtx = exportable['object'].matrix_world.copy()
+        mtx.transpose()
+        mtx = mtx * axis_conversion(
+            from_forward='X',
+            to_forward='X',
+            from_up='Y',
+            to_up='Z'
+        ).to_4x4()
+
+        inv = [[0,2],[1,2],[2,0],[2,1],[3,2]]
+        mtx = list(mtx)
+        for i in inv:
+            v = -mtx[i[0]][i[1]]
+            mtx[i[0]][i[1]] = v
+        mtx = Matrix(mtx)
+        print(mtx)
+        return Matrix(mtx)
+
+    def format_block(self, exportable, is_topmost=False):
+        if is_topmost:
+            matrix = self.get_topmost_matrix(exportable)
+        else:
+            matrix = exportable['object'].matrix_basis.copy()
+            matrix.transpose()
+            inv = [[0,2],[1,2],[2,0],[2,1],[3,2]]
+            mtx = list(matrix)
+            for i in inv:
+                v = -mtx[i[0]][i[1]]
+                mtx[i[0]][i[1]] = v
+            matrix = Matrix(mtx)
+        if exportable['type'] == 'MESH':
+            return self.format_mesh(exportable, matrix)
+        else:
+            return self.format_node(exportable, matrix)
+        return ''
+
+    def export_materials(self):
         textures = []
         for m in self.materials.values():
-            dir = os.path.dirname(out_path)
-            fname = os.path.join(dir, '%s.mat' % m['name'])
-            bd = m['blender_data']
-            out = '''//Leadwerks Material File
-            blendmode=0
-            castshadows=1
-            zsort=0
-            cullbackfaces=1
-            depthtest=1
-            depthmask=1
-            alwaysuseshader=0
-            drawmode=-1
-            shader="Shaders/Model/diffuse.shader"
-            '''
-
-            out += 'diffuse: %s\n' % ','.join(['%.9f' % c for c in list(bd.diffuse_color)])
-            out += 'specular: %s\n' % ','.join(['%.9f' % c for c in list(bd.specular_color)])
-
-            for i, ts in enumerate(bd.texture_slots):
-                try:
-                    texture_name = ts.name.lower()
-                    i = ts.texture.image
-                    i.filepath_raw = os.path.join(dir, '%s.png' % texture_name)
-                    i.file_format = 'PNG'
-                    i.save()
-                    textures.append(i.filepath_raw)
-                    out += 'texture%s="./%s.tex"' % (i, texture_name)
-                except:
-                    pass
-            with open(fname, 'w') as f:
-                f.write(out.replace('    ', ''))
-
-        for t in textures:
-            subprocess.call(
-                '/home/alrusdi/dev/Leadwerks/Tools/img2tex.linux "%s"' % t,
-                shell=True
-            )
-
-        return {'FINISHED'}
+            dir = os.path.dirname(self.options['filepath'])
+            m.save(dir)
 
     def get_conversion_matrix(self):
         cvt_matrix = axis_conversion(
             from_forward='X',
-            to_forward='-Z',
+            to_forward='Z',
             from_up='Z',
             to_up='-Y'
         ).to_4x4()
 
         mirror_z = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
-
-        return cvt_matrix * mirror_z
-
+        return mirror_z
 
     def get_header(self):
-        return '<block name="FILE" code="1"><num_kids>1</num_kids><version>2</version><subblocks>'
+        ret = '<block name="FILE" code="%s">' % constants.MDL_FILE
+        ret += '<num_kids>1</num_kids>'
+        ret += '<version>2</version><subblocks>'
+        return ret
 
     def append(self, data):
         self.out_xml = '%s%s' % (self.out_xml, data)
 
-    def get_exportables(self):
+    def get_exportables(self, target=None):
         """
-        Collect topmost exportable objects in current scene
+        Collect exportable objects in current scene
         """
-        for ob in self.context.scene.objects:
-            if ob.parent:
+        exportables = []
+        items = []
+        if not target:
+            for o in self.context.scene.objects:
+                if o.parent:
+                    continue
+                items.append(o)
+        else:
+            items = list(target.children)
+
+        for ob in items:
+            is_meshable = self.is_meshable(ob)
+            if not is_meshable and not self.has_meshables(ob):
                 continue
+            item = {}
+            if ob.type == 'ARMATURE':
+                for m in ob.children:
+                    if self.is_meshable(m):
+                        item.update({
+                            'type': 'MESH',
+                            'object': m,
+                        })
+                        ob = m
+                        break # only one mesh per armature supported
+            elif is_meshable:
+                item.update({
+                    'type': 'MESH',
+                    'object': ob,
+                })
+            else:
+                item.update({
+                    'type': 'NODE',
+                    'object': ob,
+                })
+            item['children'] = self.get_exportables(ob)
+            exportables.append(item)
+        return exportables
 
-            if ob.type == 'MESH':
-                self.meshes.append(ob)
+    def is_meshable(self, obj):
+        return obj.type == 'MESH'
 
-        return self.meshes
+    def has_meshables(self, obj):
+        for ob in obj.children:
+            if self.is_meshable(ob) or self.has_meshables(ob):
+                return True
+        return False
+
 
     def format_matrix(self, matrix):
+        print(matrix)
         ret = '<matrix>'
         floats = []
         for v in matrix:
@@ -177,16 +214,12 @@ class LeadwerksExporter(object):
         '''
         Split the single mesh into list of surfaces by materials
         '''
-        materials = [
-            {'index': None, 'name': 'default', 'material': None}
-        ]
+        materials = [Material(
+            name='default'
+        )]
 
         for idx, m in enumerate(mesh.data.materials):
-            materials.append({
-                'index': idx,
-                'name': '%s_%s' % (mesh.name.lower(), m.name.lower()),
-                'blender_data': m
-            })
+            materials.append(Material(blender_data=m))
 
         mesh = self.triangulate_mesh(mesh)
         mesh.transform(self.cvt_matrix)
@@ -204,15 +237,15 @@ class LeadwerksExporter(object):
         tcoords = {}
         for l in mesh.tessface_uv_textures:
             for face_idx, coords in l.data.items():
-                tcoords[str(face_idx)] = [
-                    self.to_str_list(list(coords.uv1)),
-                    self.to_str_list(list(coords.uv2)),
-                    self.to_str_list(list(coords.uv3)),
+                ic = [
+                    self.to_str_list([coords.uv1[0], 1 - coords.uv1[1]]),
+                    self.to_str_list([coords.uv2[0], 1 - coords.uv2[1]]),
+                    self.to_str_list([coords.uv3[0], 1 - coords.uv3[1]]),
                 ]
+                tcoords[str(face_idx)] = ic
             break
 
         faces_map = {}
-        total = len(mesh.tessfaces)
         verts_by_tc = {}
         for i, face in enumerate(mesh.tessfaces):
             idx = face.index
@@ -225,26 +258,27 @@ class LeadwerksExporter(object):
 
             coords = tcoords.get(str(idx))
 
-            for vpos, vert_idx in enumerate(f_verts):
-                icoords = coords[vpos]
-                hash = '%s_%s' % (vert_idx, '_'.join(icoords))
+            if coords:
+                for vpos, vert_idx in enumerate(f_verts):
+                    icoords = coords[vpos]
+                    hash = '%s_%s' % (vert_idx, '_'.join(icoords))
 
-                v = verts.get(vert_idx)
-                if v.get('texture_coords'):
-                    hash = '%s_%s' % (vert_idx, '_'.join(coords[vpos]))
-                    if verts_by_tc.get(hash):
-                        continue
+                    v = verts.get(vert_idx)
+                    if v.get('texture_coords'):
+                        hash = '%s_%s' % (vert_idx, '_'.join(coords[vpos]))
+                        if verts_by_tc.get(hash):
+                            continue
 
-                    new_vert = copy(v)
-                    new_vert['texture_coords'] = icoords
-                    new_idx = str(len(verts.keys()))
-                    new_hash = '%s_%s' % (new_idx, '_'.join(icoords))
-                    verts_by_tc[new_hash] = new_idx
-                    verts[new_idx] = new_vert
-                    f_verts[vpos] = new_idx
-                else:
-                    verts_by_tc[hash] = vert_idx
-                    verts[vert_idx]['texture_coords'] =icoords
+                        new_vert = copy(v)
+                        new_vert['texture_coords'] = icoords
+                        new_idx = str(len(verts.keys()))
+                        new_hash = '%s_%s' % (new_idx, '_'.join(icoords))
+                        verts_by_tc[new_hash] = new_idx
+                        verts[new_idx] = new_vert
+                        f_verts[vpos] = new_idx
+                    else:
+                        verts_by_tc[hash] = vert_idx
+                        verts[vert_idx]['texture_coords'] =icoords
 
             faces_map[k].append({
                 'material_index': face.material_index,
@@ -316,6 +350,30 @@ class LeadwerksExporter(object):
 
         return surfaces
 
+    def get_bone_weights(self, obj, verts):
+        weights = {}
+
+        if obj.parent is not None and obj.parent.type == 'ARMATURE':
+            arm_obj = obj.parent
+            for vertex_index, v in verts.items():
+                int_vertex_index = int(vertex_index)
+                iws = weights.get(vertex_index, [])
+                for vertex_group in obj.vertex_groups:
+                    try:
+                        bone = arm_obj.data.bones[vertex_group.name]
+                    except:
+                        continue
+
+                    try:
+                        bone_weight = vertex_group.weight(int_vertex_index)
+                        bone_weight = '%.9f' % bone_weight
+                        iws.append(
+                            [bone.name, bone_weight]
+                        )
+                        weights[vertex_index] = iws
+                    except:
+                        continue
+
     def format_floats(self, floats):
         return ','.join(floats)
 
@@ -326,7 +384,7 @@ class LeadwerksExporter(object):
         ret = '<block name="SURFACE" code="%s">' % constants.MDL_SURFACE
         ret += '<num_kids>7</num_kids>'
         ret += '<subblocks>'
-        ret += self.format_props([['material', 'green']])
+        ret += self.format_props([['material', surface['material']['name']]])
 
         vcount = int(len(surface['vertices'])/3)
 
@@ -415,15 +473,38 @@ class LeadwerksExporter(object):
         ret += '</block>'
         return ret
 
-    def format_mesh(self, m):
+    def format_mesh(self, exportable, matrix):
         ret = '<block name="MESH" code="%s">' % constants.MDL_MESH
-        ret += '<num_kids>2</num_kids>'
-        ret += self.format_matrix(m.matrix_basis)
+        m = exportable['object']
+        surfaces = self.get_surfaces(exportable['object'])
+        num_kids = len(surfaces)+len(exportable['children'])+1
+        ret += '<num_kids>%s</num_kids>' % num_kids
+        ret += self.format_matrix(matrix)
         ret += '<subblocks>'
         ret += self.format_props([['name', m.name]])
 
-        for surf in self.get_surfaces(m):
+        for surf in surfaces:
             ret += self.format_surface(surf)
+
+        # here should be BONE formatter somehow
+
+        for block in exportable['children']:
+            ret += self.format_block(block)
+
+        ret += '</subblocks>'
+        ret += '</block>'
+        return ret
+
+    def format_node(self, exportable, matrix):
+        ret = '<block name="NODE" code="%s">' % constants.MDL_NODE
+        num_kids = len(exportable['children'])+1
+        ret += '<num_kids>%s</num_kids>' % num_kids
+
+        ret += self.format_matrix(matrix)
+        ret += '<subblocks>'
+        ret += self.format_props([['name', exportable['object'].name]])
+        for block in exportable['children']:
+            ret += self.format_block(block)
 
         ret += '</subblocks>'
         ret += '</block>'
