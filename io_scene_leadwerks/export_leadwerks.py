@@ -6,12 +6,11 @@ from xml.dom import minidom
 import bpy
 import bmesh
 from bpy_extras.io_utils import axis_conversion
-import subprocess
-import mathutils
-from leadwerks.mdl import constants
-from material import Material
-from xml_tool import compiler
 from mathutils import Vector, Matrix
+
+from .leadwerks.mdl import constants
+from .material import Material
+from .xml_tool import compiler
 
 
 class LeadwerksExporter(object):
@@ -22,7 +21,6 @@ class LeadwerksExporter(object):
         # bpy.ops.object.mode_set(mode='OBJECT')
         self.options = kwargs
         self.context = kwargs.get('context')
-        self.cvt_matrix = self.get_conversion_matrix()
         self.materials = {}
 
     def export(self):
@@ -78,7 +76,6 @@ class LeadwerksExporter(object):
             v = -mtx[i[0]][i[1]]
             mtx[i[0]][i[1]] = v
         mtx = Matrix(mtx)
-        print(mtx)
         return Matrix(mtx)
 
     def format_block(self, exportable, is_topmost=False):
@@ -100,21 +97,9 @@ class LeadwerksExporter(object):
         return ''
 
     def export_materials(self):
-        textures = []
         for m in self.materials.values():
             dir = os.path.dirname(self.options['filepath'])
             m.save(dir)
-
-    def get_conversion_matrix(self):
-        cvt_matrix = axis_conversion(
-            from_forward='X',
-            to_forward='Z',
-            from_up='Z',
-            to_up='-Y'
-        ).to_4x4()
-
-        mirror_z = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
-        return mirror_z
 
     def get_header(self):
         ret = '<block name="FILE" code="%s">' % constants.MDL_FILE
@@ -222,7 +207,8 @@ class LeadwerksExporter(object):
             materials.append(Material(blender_data=m))
 
         mesh = self.triangulate_mesh(mesh)
-        mesh.transform(self.cvt_matrix)
+        # Mirroring mesh by Z axis to match Leadwerks coordinates system
+        mesh.transform(Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0))))
         mesh.calc_normals()
 
         verts = {}
@@ -237,12 +223,10 @@ class LeadwerksExporter(object):
         tcoords = {}
         for l in mesh.tessface_uv_textures:
             for face_idx, coords in l.data.items():
-                ic = [
-                    self.to_str_list([coords.uv1[0], 1 - coords.uv1[1]]),
-                    self.to_str_list([coords.uv2[0], 1 - coords.uv2[1]]),
-                    self.to_str_list([coords.uv3[0], 1 - coords.uv3[1]]),
-                ]
-                tcoords[str(face_idx)] = ic
+                ic = []
+                for uv in [coords.uv1, coords.uv2, coords.uv3]:
+                    ic.append([uv[0], 1 - uv[1]])
+                tcoords[str(face_idx)] = list(map(self.to_str_list, ic))
             break
 
         faces_map = {}
@@ -342,11 +326,8 @@ class LeadwerksExporter(object):
 
         for s in surfaces:
             m = s['material']
-            if m['index'] is None:
-                continue
-
-            bd = m['blender_data']
-            self.materials[bd] = m
+            if not m.name in self.materials.keys():
+                self.materials[m.name] = m
 
         return surfaces
 
@@ -384,7 +365,7 @@ class LeadwerksExporter(object):
         ret = '<block name="SURFACE" code="%s">' % constants.MDL_SURFACE
         ret += '<num_kids>7</num_kids>'
         ret += '<subblocks>'
-        ret += self.format_props([['material', surface['material']['name']]])
+        ret += self.format_props([['material', surface['material'].name]])
 
         vcount = int(len(surface['vertices'])/3)
 

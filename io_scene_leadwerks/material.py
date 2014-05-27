@@ -3,14 +3,16 @@ Classes representing Leadwerks materials
 """
 import os
 
+
 class Texture(object):
-    name = ''
-    blender_data = None
-    filename = ''
-    slot = 'diffuse'
-    needs_write=False
 
     def __init__(self, blender_texture_slot):
+        self.name = ''
+        self.blender_data = None
+        self.filename = ''
+        self.slot = 'diffuse'
+        self.needs_write=False
+
         self.blender_data = blender_texture_slot
         props_to_slot = [
             ('use_map_color_diffuse', 'diffuse'),
@@ -36,24 +38,25 @@ class Texture(object):
 
 
 class Material(object):
-    is_animated = False
-    use_specular = True
-    name = 'default'
-    blender_data = None
-    blendmode=0
-    castshadows=1
-    zsort=0
-    cullbackfaces=1
-    depthtest=1
-    depthmask=1
-    alwaysuseshader=0
-    drawmode=-1
-    diffuse = '1.0,1.0,1.0,1.0'
-    specular = '0.0,0.0,0.0,1.0'
-    shader = ''
-    textures = []
 
     def __init__(self, **kwargs):
+        self.is_animated = False
+        self.use_specular = True
+        self.name = 'default'
+        self.blender_data = None
+        self.blendmode=0
+        self.castshadows=1
+        self.zsort=0
+        self.cullbackfaces=1
+        self.depthtest=1
+        self.depthmask=1
+        self.alwaysuseshader=0
+        self.drawmode=-1
+        self.diffuse = '1.0,1.0,1.0,1.0'
+        self.specular = '0.0,0.0,0.0,1.0'
+        self.shader = ''
+        self.textures = []
+
         for k, v in kwargs.items():
             if hasattr(self, k):
                 setattr(self, k, v)
@@ -68,7 +71,7 @@ class Material(object):
                 continue
             self.textures.append(Texture(ts))
 
-        self.diffuse = '%s,1.0' % ','.join(map('str', self.blender_data.diffuse_color))
+        self.diffuse = '%s,1.0' % ','.join(map(str, self.blender_data.diffuse_color))
         # self.specular = '%s,1.0' % ','.join(map('str', self.blender_data.specular_color))
 
 
@@ -95,13 +98,12 @@ class Material(object):
         for prop in direct_props:
             out.append('%s=%s' % (prop, getattr(self, prop)))
 
-
         if self.shader:
             out.append('shader=%s' % self.shader)
         else:
             shader_name = self.guess_shader_name()
             if shader_name:
-                out.append(self.make_shader_path(shader_name))
+                out.append('shader=%s' % self.make_shader_path(shader_name))
 
         if self.textures:
             still_used = []
@@ -109,30 +111,30 @@ class Material(object):
             for idx, texture_slot in enumerate(order):
                 tx = self.find_texture_by_slot(texture_slot)
                 if tx:
-                    out.append('texture%s=%s.name' % (idx, tx.name))
+                    out.append('texture%s=./%s.tex' % (idx, tx.name))
                     still_used.append(tx.name)
 
             next_idx = 4
             for tx in self.textures:
                 if not tx.name in still_used:
-                    out.append('texture%s=%s.name' % (next_idx, tx.name))
+                    out.append('texture%s=./%s.tex' % (next_idx, tx.name))
                     next_idx +=1
-                    if save_textures:
-                        tx.save(base_dir)
-                    if next_idx > 8:
-                        break
+                if save_textures:
+                    tx.save(base_dir)
+                if next_idx > 8:
+                    break
 
 
         path = os.path.abspath(os.path.join(base_dir, '%s.mat' % self.name))
 
         with open(path, 'w') as f:
-            f.write(out)
+            f.write('\n'.join(out))
 
     def make_shader_path(self, shader_name):
-        base_path = 'shaders/model/'
+        base_path = 'Shaders/Model/'
         if self.is_animated:
-            base_path = 'animated/%s/' % base_path
-        return '%s.shader' % shader_name
+            base_path = 'Animated/%s/' % base_path
+        return '%s%s.shader' % (base_path, shader_name)
 
 
     def guess_shader_name(self):
