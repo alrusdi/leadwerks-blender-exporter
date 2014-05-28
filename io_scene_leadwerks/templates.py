@@ -47,7 +47,7 @@ sources = {
 </block>
 ''',
 
-'SURFASE':
+'SURFACE':
 '''
 <block name="SURFACE" code="{{ code }}">
     <num_kids>{{ num_kids }}</num_kids>

@@ -70,8 +70,8 @@ class Mesh(object):
         verts = {}
         for vert in mesh.vertices:
             verts[str(vert.index)] = {
-                'position': self.to_str_list(list(vert.co)),
-                'normals': self.to_str_list(
+                'position': utils.to_str_list(list(vert.co)),
+                'normals': utils.to_str_list(
                     [vert.normal.x, vert.normal.y, vert.normal.z]
                 )
             }

@@ -27,7 +27,7 @@ class CONFIG(object):
     export_materials = True
     overwrite_textures = False
     export_specular_color = False
-    write_debug_xml = False
+    write_debug_xml = True
 
     @classmethod
     def update(cls, options):
@@ -264,7 +264,7 @@ class LeadwerksExporter(object):
         context = {
             'code': constants.MDL_SURFACE,
             'props': self.format_props([['material', surface['material'].name]]),
-            'vertexarray': vertexarray,
+            'vertexarray': '\n'.join(vertexarray),
             'num_kids': len(vertexarray) + 1
         }
 
@@ -291,9 +291,8 @@ class LeadwerksExporter(object):
         num_kids = len(surfaces)+len(exportable['children'])+1
 
         bones = ''
-        arm = m.get_armature()
+        arm = m.armature
         if arm and CONFIG.export_animation:
-            arm = m.get_armature()
             bones = self.format_bone(arm.root_bone)
             if bones:
                 num_kids += 1
@@ -303,9 +302,9 @@ class LeadwerksExporter(object):
             'num_kids': num_kids,
             'matrix': utils.format_floats_box(matrix),
             'props': self.format_props([['name', m.name]]),
-            'surfaces': map(self.format_surface, surfaces),
+            'surfaces': utils.join_map(self.format_surface, surfaces),
             'bones': bones,
-            'childs': map(self.format_block, exportable['children'])
+            'childs': utils.join_map(self.format_block, exportable['children'])
         }
 
         return templates.render('MESH', context)
@@ -316,7 +315,7 @@ class LeadwerksExporter(object):
             'num_kids': len(exportable['children'])+1,
             'matrix': utils.format_floats_box(matrix),
             'props': self.format_props([['name', exportable['object'].name]]),
-            'childs': map(self.format_block, exportable['children'])
+            'childs': utils.join_map(self.format_block, exportable['children'])
         }
         return templates.render('NODE', context)
 
@@ -327,15 +326,15 @@ class LeadwerksExporter(object):
             'bone_id': bone.index,
             'matrix': utils.format_floats_box(bone.matrix_basis),
             'props': self.format_props([['name', bone.name]]),
-            'animations': map(self.format_animation_keys, bone.animations),
-            'childs': map(self.format_bone, bone.children)
+            'animations': utils.join_map(self.format_animation_keys, bone.animations),
+            'childs': utils.join_map(self.format_bone, bone.children)
         }
         return templates.render('BONE', context)
 
     def format_animation_keys(self, data):
         context = {
             'code': constants.MDL_ANIMATIONKEYS,
-            'keyframes': map(utils.format_floats_box, data['keyframes']),
+            'keyframes': list(map(utils.format_floats_box, data['keyframes'])),
             'animation_name': data['name'] if CONFIG.file_version > 1 else ''
         }
         return templates.render('ANIMATIONKEYS', context)

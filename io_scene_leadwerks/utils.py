@@ -6,7 +6,7 @@ def to_str_list(floats_list):
     return ['%.9f' % f for f in floats_list]
 
 
-def format_floats_box(self, floats):
+def format_floats_box(floats):
     """
     Formats two dimensional array of floats (like matrix) to
     string with comma separated formated values like '0.1,0.2,0.3'
@@ -17,6 +17,11 @@ def format_floats_box(self, floats):
         flat_list.extend([f for f in v])
     ret += ','.join(to_str_list(flat_list))
     return ret
+
+
+def join_map(fn, data):
+    d = list(map(fn, data))
+    return ''.join(d)
 
 
 def triangulate_mesh(meshable_obj):
