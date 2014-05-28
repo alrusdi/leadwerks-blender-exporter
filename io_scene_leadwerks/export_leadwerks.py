@@ -3,31 +3,71 @@ from copy import copy
 import os
 
 from xml.dom import minidom
-import bpy
-import bmesh
+
 from bpy_extras.io_utils import axis_conversion
 from mathutils import Vector, Matrix
 
 from .leadwerks.mdl import constants
-from .material import Material
+from . import utils
+from . import templates
+
+from .mesh import Mesh
+
 from .xml_tool import compiler
 
 
-class LeadwerksExporter(object):
-    FLOAT_EPSILON = 0.0000000001
+class CONFIG(object):
+    """
+    This values are managed by user from GUI
+    """
+    file_version = 2
+    file_extension = '.mdl'
+    export_selection = False
+    export_animation = True
+    export_materials = True
+    overwrite_textures = False
+    export_specular_color = False
+    write_debug_xml = False
 
+    @classmethod
+    def update(cls, options):
+        for k, v in cls.values().items():
+            default = v
+            val = options.get(k, default)
+            setattr(cls, k, val)
+        if cls.file_extension == '.gmf':
+            cls.file_version = 1
+
+    @classmethod
+    def values(cls):
+        vals = {}
+        types = [bool, str, int, float, dict]
+        for k, v in cls.__dict__.items():
+            if k.startswith('_') or type(v) not in types:
+                continue
+            vals[k] = v
+        return vals
+
+
+class LeadwerksExporter(object):
     def __init__(self, **kwargs):
         # Changes Blender to "object" mode
         # bpy.ops.object.mode_set(mode='OBJECT')
         self.options = kwargs
         self.context = kwargs.get('context')
         self.materials = {}
+        CONFIG.update(self.options)
+
+    def update_config(self):
+        for k, v in dict(CONFIG.__dict__).items():
+            default = v
+            val = self.options.get(k, default)
+            setattr(CONFIG, k, val)
 
     def export(self):
-        '''
+        """
         Entry point
-        '''
-
+        """
 
         exportables = self.get_exportables()
 
@@ -43,22 +83,36 @@ class LeadwerksExporter(object):
         return {'FINISHED'}
 
     def save_exportable(self, e, name=None):
-        res = self.get_header()
-        res += self.format_block(e, is_topmost=True)
-        res += '</subblocks></block>'
+        context = {
+            'code': constants.MDL_FILE,
+            'version': CONFIG.file_version,
+            'childs': self.format_block(e, is_topmost=True)
+        }
+        res = templates.render('FILE', context)
 
         out_path = self.options['filepath']
         if name:
-            out_path = os.path.join(os.path.dirname(out_path), '%s.mdl' % name)
+            name = '%s%s' % (name, CONFIG.file_extension)
+            out_path = os.path.join(os.path.dirname(out_path), name)
 
         doc = minidom.parseString(res)
         res = doc.toprettyxml()
 
-        with open('%s.xml' % out_path, 'w') as f:
-            f.write(res)
+        if CONFIG.write_debug_xml:
+            with open('%s.xml' % out_path, 'w') as f:
+                f.write(res)
 
         cc = compiler.MdlCompiler(res, out_path)
         cc.compile()
+
+    def magick_convert(self, matrix):
+            inv = [[0, 2], [1, 2], [2, 0], [2, 1], [3, 2]]
+            mtx = list(matrix)
+            for i in inv:
+                v = -mtx[i[0]][i[1]]
+                mtx[i[0]][i[1]] = v
+            matrix = Matrix(mtx)
+            return matrix
 
     def get_topmost_matrix(self, exportable):
         mtx = exportable['object'].matrix_world.copy()
@@ -70,13 +124,8 @@ class LeadwerksExporter(object):
             to_up='Z'
         ).to_4x4()
 
-        inv = [[0,2],[1,2],[2,0],[2,1],[3,2]]
-        mtx = list(mtx)
-        for i in inv:
-            v = -mtx[i[0]][i[1]]
-            mtx[i[0]][i[1]] = v
-        mtx = Matrix(mtx)
-        return Matrix(mtx)
+        mtx = self.magick_convert(mtx)
+        return mtx
 
     def format_block(self, exportable, is_topmost=False):
         if is_topmost:
@@ -84,12 +133,7 @@ class LeadwerksExporter(object):
         else:
             matrix = exportable['object'].matrix_basis.copy()
             matrix.transpose()
-            inv = [[0,2],[1,2],[2,0],[2,1],[3,2]]
-            mtx = list(matrix)
-            for i in inv:
-                v = -mtx[i[0]][i[1]]
-                mtx[i[0]][i[1]] = v
-            matrix = Matrix(mtx)
+            matrix = self.magick_convert(matrix)
         if exportable['type'] == 'MESH':
             return self.format_mesh(exportable, matrix)
         else:
@@ -100,12 +144,6 @@ class LeadwerksExporter(object):
         for m in self.materials.values():
             dir = os.path.dirname(self.options['filepath'])
             m.save(dir)
-
-    def get_header(self):
-        ret = '<block name="FILE" code="%s">' % constants.MDL_FILE
-        ret += '<num_kids>1</num_kids>'
-        ret += '<version>2</version><subblocks>'
-        return ret
 
     def append(self, data):
         self.out_xml = '%s%s' % (self.out_xml, data)
@@ -137,7 +175,7 @@ class LeadwerksExporter(object):
                             'object': m,
                         })
                         ob = m
-                        break # only one mesh per armature supported
+                        break  # only one mesh per armature supported
             elif is_meshable:
                 item.update({
                     'type': 'MESH',
@@ -161,17 +199,6 @@ class LeadwerksExporter(object):
                 return True
         return False
 
-
-    def format_matrix(self, matrix):
-        print(matrix)
-        ret = '<matrix>'
-        floats = []
-        for v in matrix:
-            floats.extend([f for f in v])
-        ret += ','.join(map(str, floats))
-        ret += '</matrix>'
-        return ret
-
     def format_props(self, props):
         """
         Formating a list of properties like:
@@ -182,324 +209,133 @@ class LeadwerksExporter(object):
         ]
         into valid xml reprezentation
         """
-        ret = '<block name="PROPERTIES" code="%s">' % constants.MDL_PROPERTIES
-        ret += '<num_kids>0</num_kids>'
-        ret += '<count>%s</count>' % len(props)
-        ret += '<properties>'
-        for k, v in props:
-            ret += '<value means="%s">%s</value>' % (k, v)
-        ret += '</properties>'
-        ret += '</block>'
-        return ret
-
-    def to_str_list(self, floats_list):
-        return ['%.9f' % f for f in floats_list]
-
-    def get_surfaces(self, mesh):
-        '''
-        Split the single mesh into list of surfaces by materials
-        '''
-        materials = [Material(
-            name='default'
-        )]
-
-        for idx, m in enumerate(mesh.data.materials):
-            materials.append(Material(blender_data=m))
-
-        mesh = self.triangulate_mesh(mesh)
-        # Mirroring mesh by Z axis to match Leadwerks coordinates system
-        mesh.transform(Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0))))
-        mesh.calc_normals()
-
-        verts = {}
-        for vert in mesh.vertices:
-            verts[str(vert.index)] = {
-                'position': self.to_str_list(list(vert.co)),
-                'normals': self.to_str_list(
-                    [vert.normal.x, vert.normal.y, vert.normal.z]
-                )
-            }
-
-        tcoords = {}
-        for l in mesh.tessface_uv_textures:
-            for face_idx, coords in l.data.items():
-                ic = []
-                for uv in [coords.uv1, coords.uv2, coords.uv3]:
-                    ic.append([uv[0], 1 - uv[1]])
-                tcoords[str(face_idx)] = list(map(self.to_str_list, ic))
-            break
-
-        faces_map = {}
-        verts_by_tc = {}
-        for i, face in enumerate(mesh.tessfaces):
-            idx = face.index
-            k = str(face.material_index)
-
-            if not k in faces_map:
-                faces_map[k] = []
-
-            f_verts = list(map(str, list(face.vertices)))
-
-            coords = tcoords.get(str(idx))
-
-            if coords:
-                for vpos, vert_idx in enumerate(f_verts):
-                    icoords = coords[vpos]
-                    hash = '%s_%s' % (vert_idx, '_'.join(icoords))
-
-                    v = verts.get(vert_idx)
-                    if v.get('texture_coords'):
-                        hash = '%s_%s' % (vert_idx, '_'.join(coords[vpos]))
-                        if verts_by_tc.get(hash):
-                            continue
-
-                        new_vert = copy(v)
-                        new_vert['texture_coords'] = icoords
-                        new_idx = str(len(verts.keys()))
-                        new_hash = '%s_%s' % (new_idx, '_'.join(icoords))
-                        verts_by_tc[new_hash] = new_idx
-                        verts[new_idx] = new_vert
-                        f_verts[vpos] = new_idx
-                    else:
-                        verts_by_tc[hash] = vert_idx
-                        verts[vert_idx]['texture_coords'] =icoords
-
-            faces_map[k].append({
-                'material_index': face.material_index,
-                'vertex_indices': list(reversed(f_verts)),
-            })
-
-        surfaces = []
-
-        for mat_idx, surface_data in faces_map.items():
-            vertices_map = {}
-
-            vertices = []
-            normals = []
-            texture_coords = []
-            tangents = []
-            binormals = []
-            indices = []
-            bone_weights = []
-            bone_indexes = []
-
-            for face in surface_data:
-                for v in face['vertex_indices']:
-                    idx = vertices_map.get(str(v))
-                    if idx is None:
-                        real_vert = verts[v]
-                        idx = len(vertices_map.values())
-                        vertices_map[str(v)] = idx
-
-                        # Distributing texture coordinates
-                        texture_coords.extend(real_vert.get('texture_coords', ['0.0', '0.0']))
-                        orig_vert = verts.get(str(v))
-                        vertices.extend(orig_vert['position'])
-                        normals.extend(orig_vert['normals'])
-
-                    indices.append(idx)
-            vert_ids = list(set(map(int, vertices_map.keys())))
-            vert_ids.sort()
-
-            for vert_id in map(str, vert_ids):
-                bone_weights.extend([0,0,0,0])
-                bone_indexes.extend([0,0,0,0])
-                tangents.extend(['0.0']*3)
-                binormals.extend(['0.0']*3)
-
-            try:
-                mat = materials[int(mat_idx)+1]
-            except IndexError:
-                mat = materials[0]
-            surfaces.append({
-                'material': mat,
-                'vertices': vertices,
-                'normals': normals,
-                'indices': indices,
-                'texture_coords': texture_coords,
-                'tangents': tangents,
-                'binormals': binormals,
-                'bone_weights': bone_weights,
-                'bone_indexes': bone_indexes,
-
-            })
-
-        for s in surfaces:
-            m = s['material']
-            if not m.name in self.materials.keys():
-                self.materials[m.name] = m
-
-        return surfaces
-
-    def get_bone_weights(self, obj, verts):
-        weights = {}
-
-        if obj.parent is not None and obj.parent.type == 'ARMATURE':
-            arm_obj = obj.parent
-            for vertex_index, v in verts.items():
-                int_vertex_index = int(vertex_index)
-                iws = weights.get(vertex_index, [])
-                for vertex_group in obj.vertex_groups:
-                    try:
-                        bone = arm_obj.data.bones[vertex_group.name]
-                    except:
-                        continue
-
-                    try:
-                        bone_weight = vertex_group.weight(int_vertex_index)
-                        bone_weight = '%.9f' % bone_weight
-                        iws.append(
-                            [bone.name, bone_weight]
-                        )
-                        weights[vertex_index] = iws
-                    except:
-                        continue
-
-    def format_floats(self, floats):
-        return ','.join(floats)
+        return templates.render(
+            'PROPERTIES',
+            {'code': constants.MDL_PROPERTIES, 'props': props}
+        )
 
     def format_ints(self, ints):
         return ','.join('%s' % i for i in ints)
 
     def format_surface(self, surface):
-        ret = '<block name="SURFACE" code="%s">' % constants.MDL_SURFACE
-        ret += '<num_kids>7</num_kids>'
-        ret += '<subblocks>'
-        ret += self.format_props([['material', surface['material'].name]])
+        vc = int(len(surface['vertices'])/3)
 
-        vcount = int(len(surface['vertices'])/3)
+        vertexarray = [
+            templates.render(
+                # Vertices
+                'VERTEXARRAY',
+                {
+                    'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                    'elements_count': 3,
+                    'data_type': ['POSITION', constants.MDL_POSITION],
+                    'variable_type': ['FLOAT', constants.MDL_FLOAT],
+                    'data': ','.join(surface['vertices'])
 
-        # Vertices
-        ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-        ret += '<elements_count>3</elements_count>'
-        ret += '<data_type><value means="POSITION">%s</value></data_type>' % constants.MDL_POSITION
-        ret += '<variable_type><value means="FLOAT">8</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_floats(surface['vertices'])
-        ret += '</block>'
+                },
+            ),
 
-        # Normals
-        ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-        ret += '<elements_count>3</elements_count>'
-        ret += '<data_type><value means="NORMAL">%s</value></data_type>' % constants.MDL_NORMAL
-        ret += '<variable_type><value means="FLOAT">8</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_floats(surface['normals'])
-        ret += '</block>'
+            templates.render(
+                # Normals
+                'VERTEXARRAY',
+                {
+                    'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                    'elements_count': 3,
+                    'data_type': ['NORMAL', constants.MDL_NORMAL],
+                    'variable_type': ['FLOAT', constants.MDL_FLOAT],
+                    'data': ','.join(surface['normals'])
 
-        # Texture coords
-        ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-        ret += '<elements_count>2</elements_count>'
-        ret += '<data_type><value means="TEXTURE_COORD">%s</value></data_type>' % constants.MDL_TEXTURE_COORD
-        ret += '<variable_type><value means="FLOAT">8</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_floats(surface['texture_coords'])
-        ret += '</block>'
+                },
+            ),
 
-        # Tangents
-        ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-        ret += '<elements_count>3</elements_count>'
-        ret += '<data_type><value means="TANGENT">%s</value></data_type>' % constants.MDL_TANGENT
-        ret += '<variable_type><value means="FLOAT">8</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_floats(surface['tangents'])
-        ret += '</block>'
+            templates.render(
+                # Texture coords
+                'VERTEXARRAY',
+                {
+                    'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                    'elements_count': 2,
+                    'data_type': ['TEXTURE_COORD', constants.MDL_TEXTURE_COORD],
+                    'variable_type': ['FLOAT', constants.MDL_FLOAT],
+                    'data': ','.join(surface['texture_coords'])
 
-        # Binormals
-        ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-        ret += '<elements_count>3</elements_count>'
-        ret += '<data_type><value means="BINORMAL">%s</value></data_type>' % constants.MDL_BINORMAL
-        ret += '<variable_type><value means="FLOAT">8</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_floats(surface['binormals'])
-        ret += '</block>'
+                },
+            ),
+        ]
 
-        '''
-        # Bone indexes
-        ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-        ret += '<elements_count>4</elements_count>'
-        ret += '<data_type><value means="BONEWEIGHT">%s</value></data_type>' % constants.MDL_BONEINDICE
-        ret += '<variable_type><value means="BYTE">2</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_ints(surface['bone_indexes'])
-        ret += '</block>'
-
-
-        # Bone weights
-        ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-        ret += '<elements_count>4</elements_count>'
-        ret += '<data_type><value means="BONEWEIGHT">%s</value></data_type>' % constants.MDL_BONEWEIGHT
-        ret += '<variable_type><value means="BYTE">2</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_ints(surface['bone_weights'])
-        ret += '</block>'
-        '''
+        context = {
+            'code': constants.MDL_SURFACE,
+            'props': self.format_props([['material', surface['material'].name]]),
+            'vertexarray': vertexarray,
+            'num_kids': len(vertexarray) + 1
+        }
 
         # Vertex indexes (faces)
-        ret += '<block code="%s" name="INDICEARRAY">' % constants.MDL_INDICEARRAY
-        ret += '<num_kids>0</num_kids>'
-        ret += '<number_of_indexes>%s</number_of_indexes>' % len(surface['indices'])
-        ret += '<primitive_type>%s</primitive_type>' % constants.MDL_TRIANGLES
-        ret += '<variable_type><value means="SHORT">4</value></variable_type>'
-        ret += '<data>%s</data>' % self.format_ints(surface['indices'])
-        ret += '</block>'
-        ret += '</subblocks>'
-        ret += '</block>'
-        return ret
+        context['indice_array'] = templates.render(
+            'INDICEARRAY',
+            {
+                'code': constants.MDL_INDICEARRAY,
+                'number_of_indexes': len(surface['indices']),
+                'primitive_type': constants.MDL_TRIANGLES,
+                'data_type': ['TEXTURE_COORD', constants.MDL_TEXTURE_COORD],
+                'variable_type': ['SHORT', constants.MDL_SHORT],
+                'data': self.format_ints(surface['indices'])
+
+            },
+        )
+
+        return templates.render('SURFACE', context)
 
     def format_mesh(self, exportable, matrix):
-        ret = '<block name="MESH" code="%s">' % constants.MDL_MESH
-        m = exportable['object']
-        surfaces = self.get_surfaces(exportable['object'])
+
+        m = Mesh(exportable['object'])
+        surfaces = m.surfaces
         num_kids = len(surfaces)+len(exportable['children'])+1
-        ret += '<num_kids>%s</num_kids>' % num_kids
-        ret += self.format_matrix(matrix)
-        ret += '<subblocks>'
-        ret += self.format_props([['name', m.name]])
 
-        for surf in surfaces:
-            ret += self.format_surface(surf)
+        bones = ''
+        arm = m.get_armature()
+        if arm and CONFIG.export_animation:
+            arm = m.get_armature()
+            bones = self.format_bone(arm.root_bone)
+            if bones:
+                num_kids += 1
 
-        # here should be BONE formatter somehow
+        context = {
+            'code': constants.MDL_MESH,
+            'num_kids': num_kids,
+            'matrix': utils.format_floats_box(matrix),
+            'props': self.format_props([['name', m.name]]),
+            'surfaces': map(self.format_surface, surfaces),
+            'bones': bones,
+            'childs': map(self.format_block, exportable['children'])
+        }
 
-        for block in exportable['children']:
-            ret += self.format_block(block)
-
-        ret += '</subblocks>'
-        ret += '</block>'
-        return ret
+        return templates.render('MESH', context)
 
     def format_node(self, exportable, matrix):
-        ret = '<block name="NODE" code="%s">' % constants.MDL_NODE
-        num_kids = len(exportable['children'])+1
-        ret += '<num_kids>%s</num_kids>' % num_kids
+        context = {
+            'code': constants.MDL_NODE,
+            'num_kids': len(exportable['children'])+1,
+            'matrix': utils.format_floats_box(matrix),
+            'props': self.format_props([['name', exportable['object'].name]]),
+            'childs': map(self.format_block, exportable['children'])
+        }
+        return templates.render('NODE', context)
 
-        ret += self.format_matrix(matrix)
-        ret += '<subblocks>'
-        ret += self.format_props([['name', exportable['object'].name]])
-        for block in exportable['children']:
-            ret += self.format_block(block)
+    def format_bone(self, bone):
+        context = {
+            'code': constants.MDL_BONE,
+            'num_kids': len(bone['children'])+1,
+            'bone_id': bone.index,
+            'matrix': utils.format_floats_box(bone.matrix_basis),
+            'props': self.format_props([['name', bone.name]]),
+            'animations': map(self.format_animation_keys, bone.animations),
+            'childs': map(self.format_bone, bone.children)
+        }
+        return templates.render('BONE', context)
 
-        ret += '</subblocks>'
-        ret += '</block>'
-        return ret
-
-    def triangulate_mesh(self, meshable_obj):
-        bm = bmesh.new()
-
-        mesh = meshable_obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
-
-        bm.from_object(meshable_obj, bpy.context.scene, deform=True, render=False)
-        bmesh.ops.triangulate(bm, faces=bm.faces)
-        bm.to_mesh(mesh)
-        bm.free()
-
-        mesh.update(calc_tessface=True, calc_edges=True)
-        return mesh
+    def format_animation_keys(self, data):
+        context = {
+            'code': constants.MDL_ANIMATIONKEYS,
+            'keyframes': map(utils.format_floats_box, data['keyframes']),
+            'animation_name': data['name'] if CONFIG.file_version > 1 else ''
+        }
+        return templates.render('ANIMATIONKEYS', context)

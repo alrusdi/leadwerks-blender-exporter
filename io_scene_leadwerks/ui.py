@@ -39,32 +39,46 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
 
-    use_selection = bpy.props.BoolProperty(
-        name="Selected Objects",
+    export_selection = bpy.props.BoolProperty(
+        name="Export only selected objects",
         description="Export selected objects on visible layers",
         default=False,
     )
-    object_types = bpy.props.EnumProperty(
-        name="Object Types",
-        options={'ENUM_FLAG'},
-        items=(('EMPTY', "Empty", ""),
-               ('MATERIAL', "Material", ""),
-               ('ARMATURE', "Armature", ""),
-               ('MESH', "Mesh", ""),
-               ),
-        default={'EMPTY', 'MATERIAL', 'ARMATURE', 'MESH'},
+    export_materials = bpy.props.BoolProperty(
+        name='Export materials',
+        default=True
     )
-
-    use_mesh_modifiers = bpy.props.BoolProperty(
-        name="Apply Modifiers",
-        description="Apply modifiers to mesh objects",
-        default=True,
+    overwrite_textures = bpy.props.BoolProperty(
+        name='Overwrite existing textures',
+        default=True
     )
-
-    sdk_path = bpy.props.StringProperty(
-        name="SDK path",
-        description="SDK root path",
-        default=""
+    export_animation = bpy.props.BoolProperty(
+        name='Overwrite existing textures',
+        default=True
+    )
+    export_specular_color = bpy.props.BoolProperty(
+        name='Export specular color',
+        default=False
+    )
+    write_debug_xml = bpy.props.BoolProperty(
+        name='Write debug XML',
+        default=False
+    )
+    file_extension = bpy.props.EnumProperty(
+        name="File extension",
+        items=(
+            ('MDL', ".mdl", ""),
+            ('GMF', ".gmf", ""),
+        ),
+        default='MDL',
+    )
+    file_version = bpy.props.EnumProperty(
+        name="File version",
+        items=(
+            ('1', "1", ""),
+            ('2', "2", ""),
+        ),
+        default='2',
     )
 
     def execute(self, context):
