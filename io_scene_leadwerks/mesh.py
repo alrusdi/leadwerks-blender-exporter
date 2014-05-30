@@ -3,6 +3,7 @@ from copy import copy
 from mathutils import Vector, Matrix
 
 from .armature import Armature
+from .config import CONFIG
 from .material import Material
 from . import utils
 
@@ -19,33 +20,50 @@ class Mesh(object):
         self.surfaces = self.parse_surfaces()
 
     def parse_armature(self):
-        p = self.blender_data.parent
-        if p and p.type == 'ARMATURE':
-            return Armature(self.parent)
+        # Getting first available Armature of object
+        # No multiple armatures supported
+        for mod in self.blender_data.modifiers:
+            if mod.type == 'ARMATURE' and mod.object:
+                return Armature(mod.object)
 
-    def parse_bone_weights(self):
+    def parse_bone_weights(self, mesh):
         weights = {}
 
         if self.armature:
-            arm_obj = self.armature.blender_data
-            for vertex_index, v in self.__verts.items():
-                int_vertex_index = int(vertex_index)
-                iws = weights.get(vertex_index, [])
-                for vertex_group in self.blender_data.vertex_groups:
-                    try:
-                        bone = arm_obj.data.bones[vertex_group.name]
-                    except:
-                        continue
 
-                    try:
-                        bone_weight = vertex_group.weight(int_vertex_index)
-                        bone_weight = '%.9f' % bone_weight
-                        iws.append(
-                            [bone.name, bone_weight]
-                        )
-                        weights[vertex_index] = iws
-                    except:
-                        continue
+            # Matching VertexGroups to bones of current Armature
+            vg_data = {}
+            for vg in self.blender_data.vertex_groups:
+
+                bone = self.armature.get_bone_by_name(vg.name)
+                bone_index = bone.index if bone else 0
+                vg_data[str(vg.index)] = bone_index
+
+            # Constructing a pairs [bone_index, bone_weight]
+            for v in self.blender_data.data.vertices:
+                iws = []
+                sum = 0
+                norm = []
+                for g in v.groups:
+                    bone_index = vg_data.get(str(g.group))
+
+                    w = g.weight
+                    norm.append(w)
+                    sum += w
+
+                    iws.append([bone_index, '0'])
+
+                if sum:
+                    # Normalizing weights
+                    # Summ of all bone weights should be 255
+                    for i, iv in enumerate(norm):
+                        iws[i][1] = '%s' % int(iv*255.0/sum)
+                else:
+                    # Default value for non weight painted vertex
+                    # This vertex will just follow bone in first available group
+                    iws[0][1] = '255'
+
+                weights[str(v.index)] = iws
         return weights
 
     def parse_surfaces(self):
@@ -73,7 +91,9 @@ class Mesh(object):
                 'position': utils.to_str_list(list(vert.co)),
                 'normals': utils.to_str_list(
                     [vert.normal.x, vert.normal.y, vert.normal.z]
-                )
+                ),
+                'bone_indexes': ['0', '0', '0', '0'],
+                'bone_weights': ['0', '0', '0', '0'],
             }
 
         tcoords = {}
@@ -111,6 +131,7 @@ class Mesh(object):
 
                         new_vert = copy(v)
                         new_vert['texture_coords'] = icoords
+                        new_vert['original_index'] = vert_idx
                         new_idx = str(len(verts.keys()))
                         new_hash = '%s_%s' % (new_idx, '_'.join(icoords))
                         verts_by_tc[new_hash] = new_idx
@@ -118,7 +139,7 @@ class Mesh(object):
                         f_verts[vpos] = new_idx
                     else:
                         verts_by_tc[hash] = vert_idx
-                        verts[vert_idx]['texture_coords'] =icoords
+                        verts[vert_idx]['texture_coords'] = icoords
 
             faces_map[k].append({
                 'material_index': face.material_index,
@@ -127,8 +148,39 @@ class Mesh(object):
 
         self.__verts = verts
 
-        surfaces = []
+        if CONFIG.export_animation:
+            weights = self.parse_bone_weights(mesh)
+            for k, v in verts.items():
+                if 'original_index' in v:
+                    idata = weights.get(v['original_index'], [])
+                else:
+                    idata = weights.get(k, [])
+                ivw = v['bone_weights']
+                ivi = v['bone_indexes']
+                pos = 0
+                amount = len(idata)
+                #if amount > 4:
+                #    print(idata, v)
+                #    raise Exception('More than 4 bones per vertex')
+                for i, w in idata:
+                    ivw[pos] = str(w)
+                    ivi[pos] = str(i)
+                    pos += 1
+                    if pos == 4:
+                        break
+                if ''.join(ivw) == '0000':
+                    ivi = ['0', '0', '0', '0']
+                verts[k].update({
+                    'bone_indexes': ivi,
+                    'bone_weights': ivw
+                })
 
+        #from pprint import pprint
+        #pprint(verts)
+
+        surfaces = []
+        # Splitting up mesh to multiple surfaces by material
+        # because only one material per surface if allowed
         for mat_idx, surface_data in faces_map.items():
             vertices_map = {}
 
@@ -152,14 +204,11 @@ class Mesh(object):
                         orig_vert = verts.get(str(v))
                         vertices.extend(orig_vert['position'])
                         normals.extend(orig_vert['normals'])
+                        bone_weights.extend(orig_vert['bone_weights'])
+                        bone_indexes.extend(orig_vert['bone_indexes'])
+
 
                     indices.append(idx)
-            vert_ids = list(set(map(int, vertices_map.keys())))
-            vert_ids.sort()
-
-            for vert_id in map(str, vert_ids):
-                bone_weights.extend([0]*4)
-                bone_indexes.extend([0]*4)
 
             try:
                 mat = materials[int(mat_idx)+1]

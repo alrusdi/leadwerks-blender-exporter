@@ -12,41 +12,9 @@ from . import utils
 from . import templates
 
 from .mesh import Mesh
+from .config import CONFIG
 
 from .xml_tool import compiler
-
-
-class CONFIG(object):
-    """
-    This values are managed by user from GUI
-    """
-    file_version = 2
-    file_extension = '.mdl'
-    export_selection = False
-    export_animation = True
-    export_materials = True
-    overwrite_textures = False
-    export_specular_color = False
-    write_debug_xml = True
-
-    @classmethod
-    def update(cls, options):
-        for k, v in cls.values().items():
-            default = v
-            val = options.get(k, default)
-            setattr(cls, k, val)
-        if cls.file_extension == '.gmf':
-            cls.file_version = 1
-
-    @classmethod
-    def values(cls):
-        vals = {}
-        types = [bool, str, int, float, dict]
-        for k, v in cls.__dict__.items():
-            if k.startswith('_') or type(v) not in types:
-                continue
-            vals[k] = v
-        return vals
 
 
 class LeadwerksExporter(object):
@@ -105,14 +73,6 @@ class LeadwerksExporter(object):
         cc = compiler.MdlCompiler(res, out_path)
         cc.compile()
 
-    def magick_convert(self, matrix):
-            inv = [[0, 2], [1, 2], [2, 0], [2, 1], [3, 2]]
-            mtx = list(matrix)
-            for i in inv:
-                v = -mtx[i[0]][i[1]]
-                mtx[i[0]][i[1]] = v
-            matrix = Matrix(mtx)
-            return matrix
 
     def get_topmost_matrix(self, exportable):
         mtx = exportable['object'].matrix_world.copy()
@@ -124,7 +84,7 @@ class LeadwerksExporter(object):
             to_up='Z'
         ).to_4x4()
 
-        mtx = self.magick_convert(mtx)
+        mtx = utils.magick_convert(mtx)
         return mtx
 
     def format_block(self, exportable, is_topmost=False):
@@ -133,7 +93,7 @@ class LeadwerksExporter(object):
         else:
             matrix = exportable['object'].matrix_basis.copy()
             matrix.transpose()
-            matrix = self.magick_convert(matrix)
+            matrix = utils.magick_convert(matrix)
         if exportable['type'] == 'MESH':
             return self.format_mesh(exportable, matrix)
         else:
@@ -167,16 +127,7 @@ class LeadwerksExporter(object):
             if not is_meshable and not self.has_meshables(ob):
                 continue
             item = {}
-            if ob.type == 'ARMATURE':
-                for m in ob.children:
-                    if self.is_meshable(m):
-                        item.update({
-                            'type': 'MESH',
-                            'object': m,
-                        })
-                        ob = m
-                        break  # only one mesh per armature supported
-            elif is_meshable:
+            if is_meshable:
                 item.update({
                     'type': 'MESH',
                     'object': ob,
@@ -261,12 +212,46 @@ class LeadwerksExporter(object):
             ),
         ]
 
+        if CONFIG.export_animation:
+            vertexarray.extend([
+                templates.render(
+                    # Bone indexes
+                    'VERTEXARRAY',
+                    {
+                        'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                        'elements_count': 4,
+                        'data_type': ['BONEINDICE', constants.MDL_BONEINDICE],
+                        'variable_type': ['BYTE', constants.MDL_UNSIGNED_BYTE],
+                        'data': ','.join(surface['bone_indexes'])
+
+                    },
+                ),
+                templates.render(
+                    # Bone weights
+                    'VERTEXARRAY',
+                    {
+                        'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                        'elements_count': 4,
+                        'data_type': ['BONEWEIGHT', constants.MDL_BONEWEIGHT],
+                        'variable_type': ['BYTE', constants.MDL_UNSIGNED_BYTE],
+                        'data': ','.join(surface['bone_weights'])
+
+                    },
+                )
+            ])
+
+        mat = surface['material']
+        if not mat.name in self.materials.keys():
+            self.materials[mat.name] = mat
+
         context = {
             'code': constants.MDL_SURFACE,
-            'props': self.format_props([['material', surface['material'].name]]),
+            'props': self.format_props([['material', mat.name]]),
             'vertexarray': '\n'.join(vertexarray),
             'num_kids': len(vertexarray) + 1
         }
+
+
 
         # Vertex indexes (faces)
         context['indice_array'] = templates.render(
@@ -293,9 +278,9 @@ class LeadwerksExporter(object):
         bones = ''
         arm = m.armature
         if arm and CONFIG.export_animation:
-            bones = self.format_bone(arm.root_bone)
+            bones = utils.join_map(self.format_bone, arm.bones)
             if bones:
-                num_kids += 1
+                num_kids += len(arm.bones)
 
         context = {
             'code': constants.MDL_MESH,
@@ -322,7 +307,7 @@ class LeadwerksExporter(object):
     def format_bone(self, bone):
         context = {
             'code': constants.MDL_BONE,
-            'num_kids': len(bone['children'])+1,
+            'num_kids': len(bone.children)+len(bone.animations)+1,
             'bone_id': bone.index,
             'matrix': utils.format_floats_box(bone.matrix_basis),
             'props': self.format_props([['name', bone.name]]),
@@ -335,6 +320,6 @@ class LeadwerksExporter(object):
         context = {
             'code': constants.MDL_ANIMATIONKEYS,
             'keyframes': list(map(utils.format_floats_box, data['keyframes'])),
-            'animation_name': data['name'] if CONFIG.file_version > 1 else ''
+            'animation_name': data['name'] if int(CONFIG.file_version) > 1 else ''
         }
         return templates.render('ANIMATIONKEYS', context)

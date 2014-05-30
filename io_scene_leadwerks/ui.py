@@ -53,7 +53,7 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
         default=True
     )
     export_animation = bpy.props.BoolProperty(
-        name='Overwrite existing textures',
+        name='Export animation',
         default=True
     )
     export_specular_color = bpy.props.BoolProperty(
@@ -62,7 +62,7 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
     )
     write_debug_xml = bpy.props.BoolProperty(
         name='Write debug XML',
-        default=False
+        default=True
     )
     file_extension = bpy.props.EnumProperty(
         name="File extension",

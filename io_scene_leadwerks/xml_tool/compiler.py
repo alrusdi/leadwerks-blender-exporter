@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from . import streams
-from io_scene_leadwerks.leadwerks.mdl import constants
+try:
+    import bpy
+    from io_scene_leadwerks.leadwerks.mdl import constants
+except ImportError:
+    from leadwerks.mdl import constants
 import xml.etree.ElementTree as ET
 
 
@@ -126,7 +130,7 @@ class MdlCompiler(object):
         size = 0
         for p in self.get_subnode_by_name(node, 'properties'):
             k = p.attrib.get('means')
-            v = p.text
+            v = p.text or ''
             props.extend([k,v])
             size = size + len(k) + len(v) + 2
         return size, props
@@ -216,7 +220,7 @@ class MdlCompiler(object):
         sz = ct*64 + 4
         if self.FILE_FORMAT_VERSION == 2:
             anim_name = self.get_subnode_by_name(node, 'animation_name').text
-            sz = len(anim_name) + 1
+            sz = sz + len(anim_name) + 1
 
         self.writer.write_batch(
             'I',

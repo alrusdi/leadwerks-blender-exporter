@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'jinja2.zip'))
 from jinja2 import Template
 
+
 sources = {
 'VERTEXARRAY':
 '''
@@ -81,7 +82,7 @@ sources = {
 '''
 <block name="BONE" code="{{ code }}">
     <num_kids>{{ num_kids }}</num_kids>
-    <bone_id>{{ bone_id }}</bone_id>'
+    <bone_id>{{ bone_id }}</bone_id>
     <matrix>
         {{ matrix }}
     </matrix>
@@ -134,30 +135,6 @@ sources = {
 </block>
 '''
 }
-
-'''
-# Bone indexes
-ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-ret += '<num_kids>0</num_kids>'
-ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-ret += '<elements_count>4</elements_count>'
-ret += '<data_type><value means="BONEINDICE">%s</value></data_type>' % constants.MDL_BONEINDICE
-ret += '<variable_type><value means="BYTE">2</value></variable_type>'
-ret += '<data>%s</data>' % self.format_ints(surface['bone_indexes'])
-ret += '</block>'
-
-
-# Bone weights
-ret += '<block code="%s" name="VERTEXARRAY">' % constants.MDL_VERTEXARRAY
-ret += '<num_kids>0</num_kids>'
-ret += '<number_of_vertices>%s</number_of_vertices>' % vcount
-ret += '<elements_count>4</elements_count>'
-ret += '<data_type><value means="BONEWEIGHT">%s</value></data_type>' % constants.MDL_BONEWEIGHT
-ret += '<variable_type><value means="BYTE">2</value></variable_type>'
-ret += '<data>%s</data>' % self.format_ints(surface['bone_weights'])
-ret += '</block>'
-'''
-
 
 def render(template, context):
     t = Template(sources.get(template))

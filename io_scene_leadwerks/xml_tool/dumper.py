@@ -203,6 +203,7 @@ class MdlDumper(object):
         for k, v in node.items():
             if k == 'blocks' or k in attrs:
                 continue
+
             if type(v) is list:
                 if not v:
                     continue
@@ -238,6 +239,5 @@ class MdlDumper(object):
         """
         Formatting key/value pairs
         """
-        if v.get('value'):
-            v = '<value means="%s">%s</value>' % (v.get('name'), v.get('value'))
+        v = '<value means="%s">%s</value>' % (v.get('name', ''), v.get('value', ''))
         return v
