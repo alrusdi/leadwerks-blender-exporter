@@ -220,7 +220,11 @@ class MdlCompiler(object):
         sz = ct*64 + 4
         if self.FILE_FORMAT_VERSION == 2:
             anim_name = self.get_subnode_by_name(node, 'animation_name').text
-            sz = sz + len(anim_name) + 1
+            if anim_name:
+                sz += len(anim_name) + 1
+            else:
+                anim_name = ''
+                sz += 2
 
         self.writer.write_batch(
             'I',

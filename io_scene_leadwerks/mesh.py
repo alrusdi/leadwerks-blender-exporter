@@ -9,6 +9,9 @@ from . import utils
 
 
 class Mesh(object):
+    """
+    Helper class for Mesh data extraction and decomposition it to surfaces
+    """
     def __init__(self, blender_data):
         self.name = blender_data.name
         self.is_animated = False
@@ -29,41 +32,45 @@ class Mesh(object):
     def parse_bone_weights(self, mesh):
         weights = {}
 
-        if self.armature:
+        if not self.armature:
+            return {}
 
-            # Matching VertexGroups to bones of current Armature
-            vg_data = {}
-            for vg in self.blender_data.vertex_groups:
+        # Matching VertexGroups to bones of current Armature
+        vg_data = {}
+        for vg in self.blender_data.vertex_groups:
 
-                bone = self.armature.get_bone_by_name(vg.name)
-                bone_index = bone.index if bone else 0
-                vg_data[str(vg.index)] = bone_index
+            bone = self.armature.get_bone_by_name(vg.name)
+            bone_index = bone.index if bone else 0
+            vg_data[str(vg.index)] = bone_index
 
-            # Constructing a pairs [bone_index, bone_weight]
-            for v in self.blender_data.data.vertices:
-                iws = []
-                sum = 0
-                norm = []
-                for g in v.groups:
-                    bone_index = vg_data.get(str(g.group))
+        # Constructing a pairs [bone_index, bone_weight]
+        for v in self.blender_data.data.vertices:
+            iws = []
+            sum = 0
+            norm = []
+            for g in v.groups:
+                bone_index = vg_data.get(str(g.group))
+                if bone_index is None:
+                    raise Exception()
+                w = g.weight
+                norm.append(w)
+                sum += w
 
-                    w = g.weight
-                    norm.append(w)
-                    sum += w
+                iws.append([bone_index, '0'])
 
-                    iws.append([bone_index, '0'])
+            if sum:
+                # Normalizing weights
+                # Summ of all bone weights should be 255
+                for i, iv in enumerate(norm):
+                    iws[i][1] = '%s' % int(iv*255.0/sum)
+            else:
+                # Default value for non weight painted vertex
+                # This vertex will just follow bone in first available group
+                print('Fallback for', v.index)
+                iws[0][1] = '255'
 
-                if sum:
-                    # Normalizing weights
-                    # Summ of all bone weights should be 255
-                    for i, iv in enumerate(norm):
-                        iws[i][1] = '%s' % int(iv*255.0/sum)
-                else:
-                    # Default value for non weight painted vertex
-                    # This vertex will just follow bone in first available group
-                    iws[0][1] = '255'
+            weights[str(v.index)] = iws
 
-                weights[str(v.index)] = iws
         return weights
 
     def parse_surfaces(self):
@@ -150,33 +157,40 @@ class Mesh(object):
 
         if CONFIG.export_animation:
             weights = self.parse_bone_weights(mesh)
-            for k, v in verts.items():
-                if 'original_index' in v:
-                    idata = weights.get(v['original_index'], [])
-                else:
-                    idata = weights.get(k, [])
-                ivw = v['bone_weights']
-                ivi = v['bone_indexes']
-                pos = 0
-                amount = len(idata)
-                #if amount > 4:
-                #    print(idata, v)
-                #    raise Exception('More than 4 bones per vertex')
-                for i, w in idata:
-                    ivw[pos] = str(w)
-                    ivi[pos] = str(i)
-                    pos += 1
-                    if pos == 4:
-                        break
-                if ''.join(ivw) == '0000':
-                    ivi = ['0', '0', '0', '0']
-                verts[k].update({
-                    'bone_indexes': ivi,
-                    'bone_weights': ivw
-                })
+            if weights:
+                self.is_animated = True
+                for k, v in verts.items():
+                    if 'original_index' in v:
+                        idata = weights.get(v['original_index'], [])
+                    else:
+                        idata = weights.get(k, [])
 
-        #from pprint import pprint
-        #pprint(verts)
+
+                    idata = sorted(idata, key=lambda d: d[1], reverse=True)
+
+                    ivw = copy(v['bone_weights'])
+                    ivi = copy(v['bone_indexes'])
+                    pos = 0
+                    #amount = len(idata)
+                    #if amount > 4:
+                    #    print('More than 4 bones per vertex: %s' % k)
+                    for i, w in idata:
+                        ivw[pos] = str(w)
+                        ivi[pos] = str(i)
+                        pos += 1
+                        if pos == 4:
+                            break
+                    if ''.join(ivw) == '0000':
+                        print('-'*50)
+                        print(k, v)
+                        print(idata)
+                        raise Exception('Empty weights detected')
+
+                    verts[k].update({
+                        'bone_indexes': ivi,
+                        'bone_weights': ivw
+                    })
+
 
         surfaces = []
         # Splitting up mesh to multiple surfaces by material
@@ -200,12 +214,14 @@ class Mesh(object):
                         vertices_map[str(v)] = idx
 
                         # Distributing texture coordinates
-                        texture_coords.extend(real_vert.get('texture_coords', ['0.0']*2))
+
+                        texture_coords.extend(real_vert.get('texture_coords', []))
                         orig_vert = verts.get(str(v))
                         vertices.extend(orig_vert['position'])
                         normals.extend(orig_vert['normals'])
                         bone_weights.extend(orig_vert['bone_weights'])
                         bone_indexes.extend(orig_vert['bone_indexes'])
+
 
 
                     indices.append(idx)
@@ -214,7 +230,7 @@ class Mesh(object):
                 mat = materials[int(mat_idx)+1]
             except IndexError:
                 mat = materials[0]
-            surfaces.append({
+            surf = {
                 'material': mat,
                 'vertices': vertices,
                 'normals': normals,
@@ -223,7 +239,8 @@ class Mesh(object):
                 'bone_weights': bone_weights,
                 'bone_indexes': bone_indexes,
 
-            })
+            }
+            surfaces.append(surf)
 
         for s in surfaces:
             m = s['material']

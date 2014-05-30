@@ -101,6 +101,8 @@ class LeadwerksExporter(object):
         return ''
 
     def export_materials(self):
+        if not CONFIG.export_materials:
+            return
         for m in self.materials.values():
             dir = os.path.dirname(self.options['filepath'])
             m.save(dir)
@@ -197,20 +199,23 @@ class LeadwerksExporter(object):
 
                 },
             ),
-
-            templates.render(
-                # Texture coords
-                'VERTEXARRAY',
-                {
-                    'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
-                    'elements_count': 2,
-                    'data_type': ['TEXTURE_COORD', constants.MDL_TEXTURE_COORD],
-                    'variable_type': ['FLOAT', constants.MDL_FLOAT],
-                    'data': ','.join(surface['texture_coords'])
-
-                },
-            ),
         ]
+
+        if surface['texture_coords']:
+            vertexarray.append(
+                templates.render(
+                    # Texture coords
+                    'VERTEXARRAY',
+                    {
+                        'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                        'elements_count': 2,
+                        'data_type': ['TEXTURE_COORD', constants.MDL_TEXTURE_COORD],
+                        'variable_type': ['FLOAT', constants.MDL_FLOAT],
+                        'data': ','.join(surface['texture_coords'])
+
+                    },
+                ),
+            )
 
         if CONFIG.export_animation:
             vertexarray.extend([

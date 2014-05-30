@@ -48,6 +48,10 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
         name='Export materials',
         default=True
     )
+    export_specular_color = bpy.props.BoolProperty(
+        name='Export specular color',
+        default=False
+    )
     overwrite_textures = bpy.props.BoolProperty(
         name='Overwrite existing textures',
         default=True
@@ -56,9 +60,15 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
         name='Export animation',
         default=True
     )
-    export_specular_color = bpy.props.BoolProperty(
-        name='Export specular color',
+    export_all_actions = bpy.props.BoolProperty(
+        name='All actions',
         default=False
+    )
+    anim_baking_step = bpy.props.IntProperty(
+        name="Animation step",
+        description=("Reduce frame count for animations"),
+        min=1, max=100,
+        default=5,
     )
     write_debug_xml = bpy.props.BoolProperty(
         name='Write debug XML',
@@ -67,10 +77,10 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
     file_extension = bpy.props.EnumProperty(
         name="File extension",
         items=(
-            ('MDL', ".mdl", ""),
-            ('GMF', ".gmf", ""),
+            ('.mdl', ".mdl", ""),
+            ('.gmf', ".gmf", ""),
         ),
-        default='MDL',
+        default='.mdl',
     )
     file_version = bpy.props.EnumProperty(
         name="File version",
