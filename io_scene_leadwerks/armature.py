@@ -93,27 +93,32 @@ class Armature(object):
             actions = bpy.data.actions.values()
         else:
             actions = [bpy.context.area.spaces.active.action]
-        for b in self.blender_data.data.bones:
 
-            pose_bone = self.blender_data.pose.bones[b.name]
-            data = []
-            for action in actions:
-                keyframes = []
-                baking_step = CONFIG.anim_baking_step
-                # set active action
-                bpy.context.area.spaces.active.action = action
+        for idx, action in enumerate(actions):
+            baking_step = CONFIG.anim_baking_step
+            # set active action
+            bpy.context.area.spaces.active.action = action
 
-                start_frame = action.frame_range[0]-baking_step
-                end_frame = action.frame_range[1]+baking_step
+            start_frame = action.frame_range[0]-baking_step
+            end_frame = action.frame_range[1]+baking_step
 
-                for frame in range(int(start_frame), int(end_frame), baking_step):
-                    bpy.data.scenes[0].frame_set(frame)
-                    keyframes.append(self.__get_mtx(pose_bone))
-                data.append({
-                    'name': action.name,
-                    'keyframes': keyframes
-                })
-            self._anims_map[b.name] = data
+            for frame in range(int(start_frame), int(end_frame), baking_step):
+                bpy.data.scenes[0].frame_set(frame)
+
+                for b in self.blender_data.data.bones:
+                    pose_bone = self.blender_data.pose.bones[b.name]
+                    mtx = self.__get_mtx(pose_bone)
+
+                    if not b.name in self._anims_map:
+                        self._anims_map[b.name] = []
+
+                    if len(self._anims_map[b.name]) == idx:
+                        self._anims_map[b.name].append({
+                            'name': action.name,
+                            'keyframes': []
+                        })
+
+                    self._anims_map[b.name][idx]['keyframes'].append(mtx)
 
         bpy.data.scenes[0].frame_set(1)
         bpy.context.area.type = current_context
