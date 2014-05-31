@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from . import streams
-try:
-    import bpy
-    from io_scene_leadwerks.leadwerks.mdl import constants
-except ImportError:
-    from leadwerks.mdl import constants
+
+from leadwerks import constants
 import xml.etree.ElementTree as ET
 
 

@@ -38,8 +38,11 @@ def magick_convert(matrix):
 mtx4_z90 = Matrix.Rotation(1.5707963267948966, 4, 'Z')
 
 def triangulate_mesh(meshable_obj):
-    bm = bmesh.new()
+    is_editmode = (meshable_obj.mode == 'EDIT')
+    if is_editmode:
+        bpy.ops.object.editmode_toggle()
 
+    bm = bmesh.new()
     mesh = meshable_obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
 
     bm.from_object(meshable_obj, bpy.context.scene, deform=True, render=False)
@@ -48,4 +51,7 @@ def triangulate_mesh(meshable_obj):
     bm.free()
 
     mesh.update(calc_tessface=True, calc_edges=True)
+
+    if is_editmode:
+        bpy.ops.object.editmode_toggle()
     return mesh

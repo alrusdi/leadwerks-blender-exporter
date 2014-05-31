@@ -7,14 +7,14 @@ from xml.dom import minidom
 from bpy_extras.io_utils import axis_conversion
 from mathutils import Vector, Matrix
 
-from .leadwerks.mdl import constants
+from . import constants
 from . import utils
 from . import templates
 
 from .mesh import Mesh
 from .config import CONFIG
 
-from .xml_tool import compiler
+from xml_tool import compiler
 
 
 class LeadwerksExporter(object):

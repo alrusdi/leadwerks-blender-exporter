@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import bpy
 from bpy_extras.io_utils import ExportHelper
-from .export_leadwerks import LeadwerksExporter
+from .exporter import LeadwerksExporter
 
 bpy.types.Material.leadwerks_base_shader = bpy.props.StringProperty(name='Shader Name')
 
@@ -26,7 +26,6 @@ class LeadwerksMaterialPanel(bpy.types.Panel):
 
         row = layout.row()
         row.prop(context.material, "leadwerks_base_shader")
-
 
 class ExportLeadwerks(bpy.types.Operator, ExportHelper):
     bl_idname = "export.mdl"
@@ -92,7 +91,7 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
     )
 
     def execute(self, context):
-        from . import export_leadwerks
+        from . import exporter
 
         kwargs = self.as_keywords()
 

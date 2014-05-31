@@ -2,6 +2,7 @@
 from struct import pack
 from array import array
 
+
 class BinaryStream(object):
     mode = 'rb'
 

@@ -3,7 +3,7 @@
 from collections import OrderedDict
 import sys
 
-from leadwerks.mdl import constants
+from leadwerks import constants
 from . import streams
 from xml.dom import minidom
 

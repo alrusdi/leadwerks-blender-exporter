@@ -15,10 +15,10 @@ bl_info = {
 
 if "bpy" in locals():
     import imp
-    imp.reload(ui)
+    imp.reload(leadwerks.ui)
 else:
     import bpy
-    from .ui import *
+    from .leadwerks.ui import *
 
 
 def menu_func_export(self, context):
