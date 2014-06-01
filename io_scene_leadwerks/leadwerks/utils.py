@@ -45,7 +45,9 @@ def triangulate_mesh(meshable_obj):
     bm = bmesh.new()
     mesh = meshable_obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
 
-    bm.from_object(meshable_obj, bpy.context.scene, deform=True, render=False)
+    bm.from_mesh(mesh)
+
+    #bm.from_object(meshable_obj, bpy.context.scene, deform=True, render=False)
     bmesh.ops.triangulate(bm, faces=bm.faces)
     bm.to_mesh(mesh)
     bm.free()

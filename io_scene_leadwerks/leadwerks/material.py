@@ -2,6 +2,7 @@
 Classes representing Leadwerks materials
 """
 import os
+from .config import CONFIG
 
 
 class Texture(object):
@@ -72,7 +73,8 @@ class Material(object):
             self.textures.append(Texture(ts))
 
         self.diffuse = '%s,1.0' % ','.join(map(str, self.blender_data.diffuse_color))
-        # self.specular = '%s,1.0' % ','.join(map('str', self.blender_data.specular_color))
+        if CONFIG.export_specular_color:
+            self.specular = '%s,1.0' % ','.join(map('str', self.blender_data.specular_color))
 
 
     def save(self, base_dir, save_textures=True):
@@ -133,7 +135,7 @@ class Material(object):
     def make_shader_path(self, shader_name):
         base_path = 'Shaders/Model/'
         if self.is_animated:
-            base_path = 'Animated/%s/' % base_path
+            base_path = '%sAnimated/' % base_path
         return '%s%s.shader' % (base_path, shader_name)
 
 
