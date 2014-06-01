@@ -144,7 +144,17 @@ class LeadwerksExporter(object):
         return exportables
 
     def is_meshable(self, obj):
-        return obj.type == 'MESH'
+        if obj.type == 'MESH':
+            return True
+
+        try:
+            od = obj.data
+            if obj.type == 'CURVE' and (od.bevel_depth > 0 or od.extrude):
+                return True
+        except:
+            raise
+
+        return False
 
     def has_meshables(self, obj):
         for ob in obj.children:

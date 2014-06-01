@@ -90,7 +90,7 @@ class Mesh(object):
         mesh = utils.triangulate_mesh(mesh)
         # Mirroring mesh by Z axis to match Leadwerks coordinate system
         mesh.transform(Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0))))
-        mesh.calc_normals()
+        #mesh.calc_normals()
 
         verts = {}
         for vert in mesh.vertices:
@@ -245,6 +245,8 @@ class Mesh(object):
         for s in surfaces:
             m = s['material']
             if not m.name in self.materials.keys():
+                if self.is_animated:
+                    m.is_animated = True
                 self.materials[m.name] = m
 
         return surfaces
