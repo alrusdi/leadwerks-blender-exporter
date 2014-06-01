@@ -1,6 +1,7 @@
 """
 Classes representing Leadwerks materials
 """
+import re
 import os
 from .config import CONFIG
 
@@ -25,8 +26,7 @@ class Texture(object):
             if getattr(self.blender_data, p):
                 self.slot = slot
                 break
-
-        self.name = blender_texture_slot.name
+        self.name = re.sub('r[\\/]]', '', blender_texture_slot.name)
 
     def save(self, dir_name):
 
