@@ -20,7 +20,7 @@ class Texture(object):
             ('use_map_color_diffuse', 'diffuse'),
             ('use_map_normal', 'normal'),
             ('use_map_color_spec', 'specular'),
-            ('use_map_color_displacement', 'displacement'),
+            ('use_map_displacement', 'displacement'),
         ]
         for p, slot in props_to_slot:
             if getattr(self.blender_data, p):
