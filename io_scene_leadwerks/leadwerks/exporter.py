@@ -1,6 +1,7 @@
 # <pep8 compliant>
 from copy import copy
 import os
+import operator
 
 from xml.dom import minidom
 
@@ -24,6 +25,7 @@ class LeadwerksExporter(object):
         self.options = kwargs
         self.context = kwargs.get('context')
         self.materials = {}
+        self.out_xml = ''
         CONFIG.update(self.options)
 
     def update_config(self):
@@ -38,6 +40,13 @@ class LeadwerksExporter(object):
         """
 
         exportables = self.get_exportables()
+
+        if not exportables:
+            self.options['operator'].report(
+                {'ERROR'},
+                "Couldn't find any exportable objects"
+            )
+            return {'CANCELLED'}
 
         for e in exportables:
             name = None
@@ -73,7 +82,6 @@ class LeadwerksExporter(object):
         cc = compiler.MdlCompiler(res, out_path)
         cc.compile()
 
-
     def get_topmost_matrix(self, exportable):
         mtx = exportable['object'].matrix_world.copy()
         mtx.transpose()
@@ -94,11 +102,11 @@ class LeadwerksExporter(object):
             matrix = exportable['object'].matrix_basis.copy()
             matrix.transpose()
             matrix = utils.magick_convert(matrix)
+
         if exportable['type'] == 'MESH':
             return self.format_mesh(exportable, matrix)
         else:
             return self.format_node(exportable, matrix)
-        return ''
 
     def export_materials(self):
         if not CONFIG.export_materials:
@@ -117,7 +125,12 @@ class LeadwerksExporter(object):
         exportables = []
         items = []
         if not target:
-            for o in self.context.scene.objects:
+            if CONFIG.export_selection:
+                objs = self.context.selected_objects
+            else:
+                objs = self.context.scene.objects
+
+            for o in objs:
                 if o.parent:
                     continue
                 items.append(o)
@@ -144,11 +157,16 @@ class LeadwerksExporter(object):
         return exportables
 
     def is_meshable(self, obj):
+        """
+        Detects if exporter can convert this type of object into mesh
+        """
         if obj.type == 'MESH':
             return True
 
         try:
             od = obj.data
+
+            # Support of mesh-like curves
             if obj.type == 'CURVE' and (od.bevel_depth > 0 or od.extrude):
                 return True
         except:
@@ -176,9 +194,6 @@ class LeadwerksExporter(object):
             'PROPERTIES',
             {'code': constants.MDL_PROPERTIES, 'props': props}
         )
-
-    def format_ints(self, ints):
-        return ','.join('%s' % i for i in ints)
 
     def format_surface(self, surface):
         vc = int(len(surface['vertices'])/3)
@@ -262,7 +277,7 @@ class LeadwerksExporter(object):
         context = {
             'code': constants.MDL_SURFACE,
             'props': self.format_props([['material', mat.name]]),
-            'vertexarray': '\n'.join(vertexarray),
+            'vertexarray': vertexarray,
             'num_kids': len(vertexarray) + 1
         }
 
@@ -277,7 +292,7 @@ class LeadwerksExporter(object):
                 'primitive_type': constants.MDL_TRIANGLES,
                 'data_type': ['TEXTURE_COORD', constants.MDL_TEXTURE_COORD],
                 'variable_type': ['SHORT', constants.MDL_SHORT],
-                'data': self.format_ints(surface['indices'])
+                'data': ','.join(map(str, surface['indices']))
 
             },
         )

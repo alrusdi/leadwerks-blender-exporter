@@ -96,7 +96,8 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
         kwargs = self.as_keywords()
 
         kwargs.update({
-            'context': context
+            'context': context,
+            'operator': self
         })
 
         return LeadwerksExporter(**kwargs).export()

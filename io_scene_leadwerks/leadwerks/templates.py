@@ -54,7 +54,9 @@ sources = {
     <num_kids>{{ num_kids }}</num_kids>
     <subblocks>
         {{ props }}
-        {{ vertexarray }}
+        {% for v in vertexarray %}
+        {{ v }}
+        {% endfor %}
         {{ indice_array }}
     </subblocks>
 </block>
