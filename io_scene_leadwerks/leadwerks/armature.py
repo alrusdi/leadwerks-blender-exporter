@@ -95,6 +95,8 @@ class Armature(object):
             actions = [bpy.context.area.spaces.active.action]
 
         for idx, action in enumerate(actions):
+            if not action:
+                break
             baking_step = CONFIG.anim_baking_step
             # set active action
             bpy.context.area.spaces.active.action = action
