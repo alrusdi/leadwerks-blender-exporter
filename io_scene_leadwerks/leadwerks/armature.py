@@ -94,6 +94,7 @@ class Armature(object):
         else:
             actions = [bpy.context.area.spaces.active.action]
 
+        print(actions)
         for idx, action in enumerate(actions):
             if not action:
                 break
@@ -105,7 +106,7 @@ class Armature(object):
             end_frame = action.frame_range[1]+baking_step
 
             for frame in range(int(start_frame), int(end_frame), baking_step):
-                bpy.data.scenes[0].frame_set(frame)
+                bpy.context.scene.frame_set(frame)
 
                 for b in self.blender_data.data.bones:
                     pose_bone = self.blender_data.pose.bones[b.name]
