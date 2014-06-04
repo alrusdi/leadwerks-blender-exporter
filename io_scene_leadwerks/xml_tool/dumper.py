@@ -89,7 +89,7 @@ class MdlDumper(object):
     def mesh_reader(self):
         ret = {
             'name': 'MESH',
-            'matrix': self.fmt_batch(self.reader.read_batch('f', 16), 'f')
+            'matrix': self.fmt_batch(self.reader.read_batch('f', 16), '.9f')
         }
         return ret
 
@@ -136,10 +136,10 @@ class MdlDumper(object):
             ret['elements_count'] = 4
             mod = 'B'
 
-        ret['data'] = self.reader.read_batch(
+        ret['data'] = self.fmt_batch(self.reader.read_batch(
             mod,
             ret['elements_count'] * ret['number_of_vertices']
-        )
+        ), '.9f')
         return ret
 
     def indices_reader(self):
@@ -156,7 +156,7 @@ class MdlDumper(object):
     def bone_reader(self):
         ret = {
             'name': 'BONE',
-            'matrix': self.fmt_batch(self.reader.read_batch('f', 16), 'f'),
+            'matrix': self.fmt_batch(self.reader.read_batch('f', 16), '.9f'),
             'bone_id': self.reader.read_int()
         }
         return ret
@@ -164,7 +164,7 @@ class MdlDumper(object):
     def node_reader(self):
         ret = {
             'name': 'NODE',
-            'matrix': self.fmt_batch(self.reader.read_batch('f', 16), 'f'),
+            'matrix': self.fmt_batch(self.reader.read_batch('f', 16), '.9f'),
         }
         return ret
 
@@ -175,7 +175,7 @@ class MdlDumper(object):
 
         for i in range(0, ret['number_of_frames']):
             ret['frames'].append(
-                self.reader.read_batch('f', 16)
+                self.fmt_batch(self.reader.read_batch('f', 16), '.9f')
             )
 
         # In version 2 animation name is added

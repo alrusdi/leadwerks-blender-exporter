@@ -44,7 +44,7 @@ class Mesh(object):
             vg_data[str(vg.index)] = bone_index
 
         # Constructing a pairs [bone_index, bone_weight]
-        for v in self.blender_data.data.vertices:
+        for v in self.triangulated_mesh.vertices:
             iws = []
             sum = 0
             norm = []
@@ -91,6 +91,7 @@ class Mesh(object):
         # Mirroring mesh by Z axis to match Leadwerks coordinate system
         mesh.transform(Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0))))
         #mesh.calc_normals()
+        self.triangulated_mesh = mesh
 
         verts = {}
         for vert in mesh.vertices:
@@ -165,8 +166,14 @@ class Mesh(object):
                     else:
                         idata = weights.get(k, [])
 
+                    if not idata:
+                        print('Empty weights:', k)
+
 
                     idata = sorted(idata, key=lambda d: d[1], reverse=True)
+
+                    if len(idata) > 4 and idata[4]:
+                        print('Lost weight %s %s' % (idata[4], k))
 
                     ivw = copy(v['bone_weights'])
                     ivi = copy(v['bone_indexes'])
