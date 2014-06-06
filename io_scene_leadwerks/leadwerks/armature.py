@@ -94,7 +94,6 @@ class Armature(object):
         else:
             actions = [bpy.context.area.spaces.active.action]
 
-        print(actions)
         for idx, action in enumerate(actions):
             if not action:
                 break

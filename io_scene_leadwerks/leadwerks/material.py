@@ -100,12 +100,19 @@ class Material(object):
         for prop in direct_props:
             out.append('%s=%s' % (prop, getattr(self, prop)))
 
+        # Adding primary shader
         if self.shader:
             out.append('shader=%s' % self.shader)
         else:
             shader_name = self.guess_shader_name()
             if shader_name:
                 out.append('shader=%s' % self.make_shader_path(shader_name))
+
+        # Adding shaddow shader
+        if self.is_animated:
+            out.append('shader1="Shaders/Model/Shadow/shadow+animation.shader"')
+        else:
+            out.append('shader1="Shaders/Model/Shadow/shadow.shader"')
 
         if self.textures:
             still_used = []
