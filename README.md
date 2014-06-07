@@ -5,8 +5,8 @@ Exporter for geometry, materaials, textures, skeletal animations from Blender to
 
 Installation
 ==========================
-Put the io_scene_leadwerks into your Blender addons directory.  
-Refer to the [official blender documentation](http://wiki.blender.org/index.php/Doc:2.6/Manual/Extensions/Python/Add-Ons) to find addons directory
+1. Put the io_scene_leadwerks into your Blender addons directory. Refer to the [official blender documentation](http://wiki.blender.org/index.php/Doc:2.6/Manual/Extensions/Python/Add-Ons) to find addons directory
+2. Enable addon in User Preferences. See [Roland's instructions](http://www.leadwerks.com/werkspace/topic/9996-blender-exporter-available/#entry74315) for it 
 
 Support
 ==========================
