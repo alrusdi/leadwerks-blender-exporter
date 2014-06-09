@@ -16,17 +16,20 @@ class Texture(object):
         self.needs_write=False
 
         self.blender_data = blender_texture_slot
-        props_to_slot = [
-            ('use_map_color_diffuse', 'diffuse'),
-            ('use_map_normal', 'normal'),
-            ('use_map_color_spec', 'specular'),
-            ('use_map_displacement', 'displacement'),
-        ]
-        for p, slot in props_to_slot:
-            if getattr(self.blender_data, p):
-                self.slot = slot
-                break
         self.name = re.sub('r[\\/]', '', blender_texture_slot.name)
+
+        props_to_slot = [
+            [['use_map_color_diffuse', 'use_map_diffuse'], 'diffuse'],
+            [['use_map_normal'], 'normal'],
+            [['use_map_color_spec', 'use_map_specular'], 'specular'],
+            [['use_map_displacement'], 'displacement'],
+        ]
+
+        for props_list, slot in props_to_slot:
+            for p in props_list:
+                if getattr(self.blender_data, p):
+                    self.slot = slot
+                    return
 
     def save(self, dir_name):
 
