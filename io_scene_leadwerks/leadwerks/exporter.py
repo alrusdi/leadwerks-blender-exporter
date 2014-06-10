@@ -242,6 +242,32 @@ class LeadwerksExporter(object):
                 ),
             )
 
+        if surface['tangents']:
+            vertexarray.extend([
+                templates.render(
+                    # Tangents
+                    'VERTEXARRAY',
+                    {
+                        'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                        'elements_count': 3,
+                        'data_type': ['TANGENT', constants.MDL_TANGENT],
+                        'variable_type': ['FLOAT', constants.MDL_FLOAT],
+                        'data': ','.join(surface['tangents'])
+                    },
+                ),
+                templates.render(
+                    # Binormals
+                    'VERTEXARRAY',
+                    {
+                        'code': constants.MDL_VERTEXARRAY, 'number_of_vertices': vc,
+                        'elements_count': 3,
+                        'data_type': ['BINORMAL', constants.MDL_BINORMAL],
+                        'variable_type': ['FLOAT', constants.MDL_FLOAT],
+                        'data': ','.join(surface['binormals'])
+                    },
+                ),
+            ])
+
         if CONFIG.export_animation:
             vertexarray.extend([
                 templates.render(

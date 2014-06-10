@@ -5,7 +5,7 @@ from mathutils import Vector, Matrix
 from .armature import Armature
 from .config import CONFIG
 from .material import Material
-from . import utils
+from . import utils, texspace
 
 
 class Mesh(object):
@@ -115,6 +115,7 @@ class Mesh(object):
 
         faces_map = {}
         verts_by_tc = {}
+        has_texture_coords = False
         for i, face in enumerate(mesh.tessfaces):
             idx = face.index
             k = str(face.material_index)
@@ -133,6 +134,7 @@ class Mesh(object):
 
                     v = verts.get(vert_idx)
                     if v.get('texture_coords'):
+                        has_texture_coords = True
                         hash = '%s_%s' % (vert_idx, '_'.join(coords[vpos]))
                         if verts_by_tc.get(hash):
                             continue
@@ -157,6 +159,15 @@ class Mesh(object):
         self.__verts = verts
 
         if CONFIG.export_animation:
+            # Calculating Tangents and Binormals
+            if has_texture_coords:
+                for faces in faces_map.values():
+                    for face in faces:
+                        iverts = utils.mget(verts, face['vertex_indices'])
+                        texspace.update_tangents_and_binormals(iverts)
+
+
+            # Extracting bone weights
             weights = self.parse_bone_weights(mesh)
             if weights:
                 self.is_animated = True
@@ -211,6 +222,8 @@ class Mesh(object):
             indices = []
             bone_weights = []
             bone_indexes = []
+            tangents = []
+            binormals = []
 
             for face in surface_data:
                 for v in face['vertex_indices']:
@@ -228,6 +241,9 @@ class Mesh(object):
                         normals.extend(orig_vert['normals'])
                         bone_weights.extend(orig_vert['bone_weights'])
                         bone_indexes.extend(orig_vert['bone_indexes'])
+                        if 'tangent' in orig_vert:
+                            tangents.extend(utils.to_str_list(list(orig_vert['tangent'])))
+                            binormals.extend(utils.to_str_list(list(orig_vert['binormal'])))
 
 
 
@@ -247,6 +263,9 @@ class Mesh(object):
                 'bone_indexes': bone_indexes,
 
             }
+            if tangents:
+                surf['tangents'] = tangents
+                surf['binormals'] = binormals
             surfaces.append(surf)
 
         for s in surfaces:

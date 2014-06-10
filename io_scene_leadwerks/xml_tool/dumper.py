@@ -139,7 +139,7 @@ class MdlDumper(object):
         ret['data'] = self.fmt_batch(self.reader.read_batch(
             mod,
             ret['elements_count'] * ret['number_of_vertices']
-        ), '.9f')
+        ), '.9f' if mod == 'f' else 'd')
         return ret
 
     def indices_reader(self):

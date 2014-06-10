@@ -3,6 +3,13 @@ import bmesh
 from mathutils import Matrix
 
 
+def mget(inp_dict, inp_keys):
+    ret = []
+    for k in inp_keys:
+        ret.append(inp_dict.get(k))
+    return ret
+
+
 def to_str_list(floats_list):
     return ['%.9f' % f for f in floats_list]
 
