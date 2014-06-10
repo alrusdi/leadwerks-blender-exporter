@@ -158,15 +158,14 @@ class Mesh(object):
 
         self.__verts = verts
 
+        # Calculating Tangents and Binormals
+        if has_texture_coords:
+            for faces in faces_map.values():
+                for face in faces:
+                    iverts = utils.mget(verts, face['vertex_indices'])
+                    texspace.update_tangents_and_binormals(iverts)
+
         if CONFIG.export_animation:
-            # Calculating Tangents and Binormals
-            if has_texture_coords:
-                for faces in faces_map.values():
-                    for face in faces:
-                        iverts = utils.mget(verts, face['vertex_indices'])
-                        texspace.update_tangents_and_binormals(iverts)
-
-
             # Extracting bone weights
             weights = self.parse_bone_weights(mesh)
             if weights:
