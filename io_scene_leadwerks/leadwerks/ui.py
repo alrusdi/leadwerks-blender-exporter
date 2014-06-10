@@ -67,7 +67,7 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
         name="Animation step",
         description=("Reduce frame count for animations"),
         min=1, max=100,
-        default=5,
+        default=1,
     )
     write_debug_xml = bpy.props.BoolProperty(
         name='Write debug XML',

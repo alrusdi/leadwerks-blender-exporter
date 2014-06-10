@@ -13,7 +13,7 @@ class CONFIG(object):
     overwrite_textures = False
     export_specular_color = False
     write_debug_xml = True
-    anim_baking_step = 5
+    anim_baking_step = 1
     export_all_actions = False
 
 
