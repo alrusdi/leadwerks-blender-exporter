@@ -89,11 +89,8 @@ class Armature(object):
         bpy.context.space_data.mode = "ACTION"
 
         # For each action retrieving bone matrixes
-        if CONFIG.export_all_actions:
-            actions = bpy.data.actions.values()
-        else:
-            actions = [bpy.context.area.spaces.active.action]
 
+        actions = self.__get_needed_actions()
         for idx, action in enumerate(actions):
             if not action:
                 break
@@ -124,6 +121,17 @@ class Armature(object):
 
         bpy.data.scenes[0].frame_set(1)
         bpy.context.area.type = current_context
+
+    def __get_needed_actions(self):
+        all_actions = bpy.data.actions.values()
+        if not all_actions:
+            return []
+
+        if CONFIG.export_all_actions:
+            return all_actions
+
+        active_action = bpy.context.area.spaces.active.action
+        return [active_action] if active_action else [all_actions[0]]
 
     def get_bone_by_name(self, bone_name):
         """
