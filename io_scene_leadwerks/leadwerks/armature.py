@@ -46,9 +46,14 @@ class Armature(object):
         # Building bones hierarchy
 
         second_level_bones = []
+        self.__needs_export = []
         for b in blender_data.data.bones:
             if not b.parent:
                 second_level_bones.append(b)
+            if b.use_deform and not b.name in self.__needs_export:
+                self.__needs_export.append(b.name)
+                for pb in b.parent_recursive:
+                    self.__needs_export.append(pb.name)
         self.bones = self.parse_bones(second_level_bones)
 
     def __fake_keyframe(self):
@@ -57,6 +62,8 @@ class Armature(object):
     def parse_bones(self, bones):
         ret = []
         for b in bones:
+            if not b.name in self.__needs_export:
+                continue
             new_bone = Bone(blender_data=b)
             new_bone.index = self.current_bone_index
             self.current_bone_index += 1
