@@ -46,28 +46,32 @@ class Mesh(object):
         # Constructing a pairs [bone_index, bone_weight]
         for v in self.triangulated_mesh.vertices:
             iws = []
-            sum = 0
-            norm = []
             for g in v.groups:
                 bone_index = vg_data.get(str(g.group))
                 if bone_index is None:
                     raise Exception()
                 w = g.weight
-                norm.append(w)
-                sum += w
+                iws.append([bone_index, w])
+            # Sorting by weight
+            iws = sorted(iws, key=lambda d: d[1], reverse=True)
 
-                iws.append([bone_index, '0'])
+            # Supporting only 4 top weighted bones (some weights may lost)
+            if len(iws) > 4 and iws[4][1]:
+                print('Lost weight', v.index, iws)
+            iws = iws[0:4]
 
-            if sum:
+            wsum = sum([i[1] for i in iws])
+            if wsum:
                 # Normalizing weights
-                # Summ of all bone weights should be 255
-                for i, iv in enumerate(norm):
-                    iws[i][1] = '%s' % int(iv*255.0/sum)
+                # Sum of all bone weights should be 255
+                for i, iv in enumerate(iws):
+                    w = int(iv[1]*255.0/wsum)
+                    iws[i][1] = w
             else:
                 # Default value for non weight painted vertex
                 # This vertex will just follow bone in first available group
                 print('Fallback for', v.index)
-                iws[0][1] = '255'
+                iws[0][1] = 255
 
             weights[str(v.index)] = iws
 
@@ -89,7 +93,8 @@ class Mesh(object):
 
         mesh = utils.triangulate_mesh(mesh)
         # Mirroring mesh by Z axis to match Leadwerks coordinate system
-        mesh.transform(Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0))))
+        trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0))) * self.blender_data.matrix_world
+        mesh.transform(trans)
         #mesh.calc_normals()
         self.triangulated_mesh = mesh
 
@@ -180,23 +185,15 @@ class Mesh(object):
                         print('Empty weights:', k)
 
 
-                    idata = sorted(idata, key=lambda d: d[1], reverse=True)
-
-                    if len(idata) > 4 and idata[4]:
-                        print('Lost weight %s %s' % (idata[4], k))
-
                     ivw = copy(v['bone_weights'])
                     ivi = copy(v['bone_indexes'])
                     pos = 0
-                    #amount = len(idata)
-                    #if amount > 4:
-                    #    print('More than 4 bones per vertex: %s' % k)
+
                     for i, w in idata:
                         ivw[pos] = str(w)
                         ivi[pos] = str(i)
                         pos += 1
-                        if pos == 4:
-                            break
+
                     if ''.join(ivw) == '0000':
                         print('-'*50)
                         print(k, v)
@@ -260,11 +257,9 @@ class Mesh(object):
                 'texture_coords': texture_coords,
                 'bone_weights': bone_weights,
                 'bone_indexes': bone_indexes,
-
+                'tangents': tangents,
+                'binormals': binormals
             }
-            if tangents:
-                surf['tangents'] = tangents
-                surf['binormals'] = binormals
             surfaces.append(surf)
 
         for s in surfaces:

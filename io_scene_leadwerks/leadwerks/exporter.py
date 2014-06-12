@@ -49,11 +49,10 @@ class LeadwerksExporter(object):
             return {'CANCELLED'}
 
         for e in exportables:
-            name = None
+            wanted_name = os.path.basename(self.options['filepath'])
+            name = wanted_name[0:-4]
             if len(exportables) > 1:
-                wanted_name = os.path.basename(self.options['filepath'])
-                wanted_name = wanted_name[0:-4]
-                name = '%s_%s' % (wanted_name, e['object'].name.lower())
+                name = '%s_%s' % (name, e['object'].name.lower())
             self.save_exportable(e, name)
 
         self.export_materials()

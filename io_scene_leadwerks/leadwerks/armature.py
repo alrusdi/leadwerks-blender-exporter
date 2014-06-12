@@ -51,7 +51,6 @@ class Armature(object):
                 second_level_bones.append(b)
         self.bones = self.parse_bones(second_level_bones)
 
-
     def __fake_keyframe(self):
         return Matrix.Identity(4)
 

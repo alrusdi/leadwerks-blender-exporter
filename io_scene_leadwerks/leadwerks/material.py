@@ -38,7 +38,10 @@ class Texture(object):
         )
         if not os.path.exists(save_path):
             img = self.blender_data.texture.image
-            img.save_render(save_path)
+            try:
+                img.save_render(save_path)
+            except:
+                print('Texture "%s" not exported sorry' % img)
 
 
 class Material(object):

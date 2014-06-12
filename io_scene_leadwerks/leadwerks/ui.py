@@ -91,8 +91,6 @@ class ExportLeadwerks(bpy.types.Operator, ExportHelper):
     )
 
     def execute(self, context):
-        from . import exporter
-
         kwargs = self.as_keywords()
 
         kwargs.update({
