@@ -27,7 +27,7 @@ class Mesh(object):
         # No multiple armatures supported
         for mod in self.blender_data.modifiers:
             if mod.type == 'ARMATURE' and mod.object:
-                return Armature(mod.object)
+                return Armature(mod.object, self.blender_data)
 
     def parse_bone_weights(self, mesh):
         weights = {}
@@ -93,9 +93,12 @@ class Mesh(object):
 
         mesh = utils.triangulate_mesh(mesh)
         # Mirroring mesh by Z axis to match Leadwerks coordinate system
-        trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0))) * self.blender_data.matrix_world
+        trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
         mesh.transform(trans)
-        #mesh.calc_normals()
+        mesh.transform(utils.mtx_mesh)
+
+        print(utils.mtx_mesh)
+
         self.triangulated_mesh = mesh
 
         verts = {}

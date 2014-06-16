@@ -84,14 +84,16 @@ class LeadwerksExporter(object):
     def get_topmost_matrix(self, exportable):
         mtx = exportable['object'].matrix_world.copy()
         mtx.transpose()
+        '''
         mtx = mtx * axis_conversion(
-            from_forward='X',
-            to_forward='X',
-            from_up='Y',
-            to_up='Z'
+            from_forward='Y',
+            to_forward='Y',
+            from_up='Z',
+            to_up='X'
         ).to_4x4()
-
-        mtx = utils.magick_convert(mtx)
+        '''
+        print(mtx)
+        # mtx = utils.magick_convert(mtx)
         return mtx
 
     def format_block(self, exportable, is_topmost=False):

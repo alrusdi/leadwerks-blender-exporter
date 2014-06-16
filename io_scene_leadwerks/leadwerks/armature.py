@@ -32,14 +32,14 @@ class Armature(object):
     and bake bone animations
     """
 
-    def __init__(self, blender_data):
+    def __init__(self, blender_data, target_mesh):
         # @TODO cache parsed armature data in global scope to avoid baking the same animation multiple times
         self.blender_data = blender_data
         self.current_bone_index = 0
 
         self._name_map = {}
         self._anims_map = {}
-
+        self.target_mesh = target_mesh
         # Baking animations
         self.parse_animations()
 

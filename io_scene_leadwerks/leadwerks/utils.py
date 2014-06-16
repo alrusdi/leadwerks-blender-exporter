@@ -44,6 +44,8 @@ def magick_convert(matrix):
 # 1.5707963267948966 = PI/2
 mtx4_z90 = Matrix.Rotation(1.5707963267948966, 4, 'Z')
 mtx4_z180 = Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
+mtx_mesh = (Matrix.Rotation(1.5707963267948966, 4, 'Z').inverted() * Matrix.Rotation(1.5707963267948966, 4, 'X').inverted()).inverted()
+mtx_node = Matrix.Rotation(1.5707963267948966, 4, 'Z')
 
 def triangulate_mesh(meshable_obj):
     is_editmode = (meshable_obj.mode == 'EDIT')
