@@ -6,7 +6,7 @@ import operator
 from xml.dom import minidom
 
 from bpy_extras.io_utils import axis_conversion
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, Euler
 
 from . import constants
 from . import utils
@@ -83,17 +83,22 @@ class LeadwerksExporter(object):
 
     def get_topmost_matrix(self, exportable):
         mtx = exportable['object'].matrix_world.copy()
-        mtx.transpose()
-        '''
-        mtx = mtx * axis_conversion(
-            from_forward='Y',
-            to_forward='Y',
-            from_up='Z',
-            to_up='X'
-        ).to_4x4()
-        '''
-        print(mtx)
-        # mtx = utils.magick_convert(mtx)
+        pos, rot, scale = mtx.decompose()
+
+        mat_trans = Matrix.Translation(Vector((pos[1], pos[2], pos[0]))).to_4x4()
+        eul = rot.to_euler('XYZ')
+
+        mat_rot = Euler((-eul[1], eul[2], eul[0]), 'XYZ').to_matrix().to_4x4()
+
+        mat_scale = Matrix.Identity(4)
+        mat_scale[0][0] = scale[1]
+        mat_scale[1][1] = scale[2]
+        mat_scale[2][2] = scale[0]
+
+        mtx = Matrix.Identity(4) * mat_scale
+        mtx = mtx * mat_rot
+        mtx = mtx * mat_trans
+
         return mtx
 
     def format_block(self, exportable, is_topmost=False):

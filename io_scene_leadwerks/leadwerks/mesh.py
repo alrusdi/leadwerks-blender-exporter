@@ -94,10 +94,7 @@ class Mesh(object):
         mesh = utils.triangulate_mesh(mesh)
         # Mirroring mesh by Z axis to match Leadwerks coordinate system
         trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
-        mesh.transform(trans)
-        mesh.transform(utils.mtx_mesh)
-
-        print(utils.mtx_mesh)
+        mesh.transform(utils.mtx_mesh * trans)
 
         self.triangulated_mesh = mesh
 
