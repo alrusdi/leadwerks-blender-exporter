@@ -1,6 +1,6 @@
 import bpy
 import bmesh
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 
 def mget(inp_dict, inp_keys):
@@ -42,10 +42,11 @@ def magick_convert(matrix):
         return matrix
 
 # 1.5707963267948966 = PI/2
-mtx4_z90 = Matrix.Rotation(1.5707963267948966, 4, 'Z')
 mtx4_z180 = Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
 mtx_mesh = Matrix.Rotation(-1.5707963267948966, 4, 'Y') * Matrix.Rotation(1.5707963267948966, 4, 'X')
 mtx_node = Matrix.Rotation(1.5707963267948966, 4, 'Z')
+
+mtx4_z90 = mtx_mesh * Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
 
 def triangulate_mesh(meshable_obj):
     is_editmode = (meshable_obj.mode == 'EDIT')
