@@ -46,7 +46,7 @@ mtx4_z180 = Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
 mtx_mesh = Matrix.Rotation(-1.5707963267948966, 4, 'Y') * Matrix.Rotation(1.5707963267948966, 4, 'X')
 mtx_node = Matrix.Rotation(1.5707963267948966, 4, 'Z')
 
-mtx4_z90 = mtx_mesh * Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
+mtx4_z90 = Matrix.Rotation(1.5707963267948966, 4, 'Z')
 
 def triangulate_mesh(meshable_obj):
     is_editmode = (meshable_obj.mode == 'EDIT')
