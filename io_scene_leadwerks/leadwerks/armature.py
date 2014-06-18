@@ -15,14 +15,14 @@ class Bone(object):
         self.parent = None
         self.children = []
         self.animations = []
-        self.matrix_basis = Matrix.Identity(4)
+        self.matrix_basis = None
 
         if blender_data:
             self.blender_data = blender_data
             self.name = blender_data.name
 
     def setup_matrix(self):
-        if self.animations:
+        if self.animations and not self.matrix_basis:
             self.matrix_basis = self.animations[0]['keyframes'][0]
 
 
@@ -66,6 +66,13 @@ class Armature(object):
                 continue
             new_bone = Bone(blender_data=b)
             new_bone.index = self.current_bone_index
+            if not b.parent:
+                new_bone.matrix_basis = Matrix((
+                    (0.0, 0.0, -1.0, 0.0),
+                    (-1.0, 0.0, 0.0, 0.0),
+                    (0.0, 1.0, 0.0, 0.0),
+                    (0.0, 0.0, 0.0, 1.0),
+                ))
             self.current_bone_index += 1
             new_bone.animations = self._anims_map.get(b.name, [])
             new_bone.setup_matrix()
@@ -86,7 +93,8 @@ class Armature(object):
             par = pose_bone.parent.matrix.copy()
             mtx = (par * utils.mtx4_z90).inverted() * mtx * utils.mtx4_z90
         mtx.transpose()
-        return utils.magick_convert(mtx)
+        mtx = utils.magick_convert(mtx)
+        return mtx
 
     def parse_animations(self):
          # get current context and then switch to dopesheet temporarily

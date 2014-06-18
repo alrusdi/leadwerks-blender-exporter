@@ -1,6 +1,6 @@
 import bpy
 import bmesh
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Vector, Euler
 
 
 def mget(inp_dict, inp_keys):
@@ -68,3 +68,30 @@ def triangulate_mesh(meshable_obj):
     if is_editmode:
         bpy.ops.object.editmode_toggle()
     return mesh
+
+def convert_to_lw_matrix(mtx):
+    pos, rot, scale = mtx.decompose()
+
+    mat_trans = Matrix.Translation(Vector((pos[1], pos[2], pos[0]))).to_4x4()
+    eul = rot.to_euler('XYZ')
+
+    mat_rot = Euler((-eul[1], eul[2], eul[0]), 'XYZ').to_matrix().to_4x4()
+
+    mat_scale = Matrix.Identity(4)
+    mat_scale[0][0] = scale[1]
+    mat_scale[1][1] = scale[2]
+    mat_scale[2][2] = scale[0]
+
+    mtx = Matrix.Identity(4) * mat_scale
+    mtx = mtx * mat_rot
+    mtx = mtx * mat_trans
+
+    mtx[3][0] = mtx[1][3]
+    mtx[3][1] = mtx[2][3]
+    mtx[3][2] = mtx[0][3]
+
+    mtx[0][3] = 0.0
+    mtx[1][3] = 0.0
+    mtx[2][3] = 0.0
+
+    return mtx

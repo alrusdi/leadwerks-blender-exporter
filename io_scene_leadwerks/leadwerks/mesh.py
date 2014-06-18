@@ -57,8 +57,6 @@ class Mesh(object):
             iws = sorted(iws, key=lambda d: d[1], reverse=True)
 
             # Supporting only 4 top weighted bones (some weights may lost)
-            if len(iws) > 4 and iws[4][1]:
-                print('Lost weight', v.index, iws)
             iws = iws[0:4]
 
             wsum = sum([i[1] for i in iws])
