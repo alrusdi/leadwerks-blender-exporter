@@ -89,9 +89,10 @@ class LeadwerksExporter(object):
         if is_topmost:
             matrix = self.get_topmost_matrix(exportable)
         else:
-            matrix = exportable['object'].matrix_basis.copy()
-            matrix.transpose()
-            matrix = utils.magick_convert(matrix)
+            matrix = exportable['object'].matrix_local.copy()
+            #matrix.transpose()
+            #matrix = utils.magick_convert(matrix)
+            matrix = utils.convert_to_lw_matrix(matrix)
 
         if exportable['type'] == 'MESH':
             return self.format_mesh(exportable, matrix)
@@ -131,17 +132,21 @@ class LeadwerksExporter(object):
             is_meshable = self.is_meshable(ob)
             if not is_meshable and not self.has_meshables(ob):
                 continue
-            item = {}
-            if is_meshable:
-                item.update({
-                    'type': 'MESH',
-                    'object': ob,
-                })
+            if ob.type == 'ARMATURE':
+                exportables.extend(
+                    self.get_exportables(ob)
+                )
+                continue
+            elif is_meshable:
+                    item = {
+                        'type': 'MESH',
+                        'object': ob,
+                    }
             else:
-                item.update({
+                item = {
                     'type': 'NODE',
                     'object': ob,
-                })
+                }
             item['children'] = self.get_exportables(ob)
             exportables.append(item)
         return exportables

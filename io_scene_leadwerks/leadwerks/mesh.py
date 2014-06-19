@@ -41,7 +41,7 @@ class Mesh(object):
         for vg in self.blender_data.vertex_groups:
 
             bone = self.armature.get_bone_by_name(vg.name)
-            bone_index = bone.index if bone else 0
+            bone_index = bone.index if bone else 1
             vg_data[str(vg.index)] = bone_index
 
         # Constructing a pairs [bone_index, bone_weight]
@@ -94,7 +94,7 @@ class Mesh(object):
         # Mirroring mesh by Z axis to match Leadwerks coordinate system
         trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
         if self.armature:
-            mesh.transform(trans)
+            mesh.transform(trans * self.blender_data.matrix_world.copy() * Matrix.Rotation(-1.5707963267948966, 4, 'X'))
         else:
             mesh.transform(utils.mtx_mesh * trans)
 
@@ -107,8 +107,8 @@ class Mesh(object):
                 'normals': utils.to_str_list(
                     [vert.normal.x, vert.normal.y, vert.normal.z]
                 ),
-                'bone_indexes': ['0', '0', '0', '0'],
-                'bone_weights': ['0', '0', '0', '0'],
+                'bone_indexes': ['1', '1', '1', '1'],
+                'bone_weights': ['255', '0', '0', '0'],
             }
 
         tcoords = {}

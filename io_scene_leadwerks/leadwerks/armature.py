@@ -15,14 +15,19 @@ class Bone(object):
         self.parent = None
         self.children = []
         self.animations = []
-        self.matrix_basis = None
+        self.matrix_basis = Matrix((
+            (1.0, 0.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0, 0.0),
+            (0.0, -1.0, 0.0, 0.0),
+            (0.0, 0.0, 0.0, 1.0),
+        ))
 
         if blender_data:
             self.blender_data = blender_data
             self.name = blender_data.name
 
     def setup_matrix(self):
-        if self.animations and not self.matrix_basis:
+        if self.animations:
             self.matrix_basis = self.animations[0]['keyframes'][0]
 
 
@@ -35,7 +40,7 @@ class Armature(object):
     def __init__(self, blender_data, target_mesh):
         # @TODO cache parsed armature data in global scope to avoid baking the same animation multiple times
         self.blender_data = blender_data
-        self.current_bone_index = 0
+        self.current_bone_index = 1
 
         self._name_map = {}
         self._anims_map = {}
@@ -54,7 +59,18 @@ class Armature(object):
                 self.__needs_export.append(b.name)
                 for pb in b.parent_recursive:
                     self.__needs_export.append(pb.name)
-        self.bones = self.parse_bones(second_level_bones)
+        topmost_bone = Bone()
+        topmost_bone.name = blender_data.name
+        anim_tpl = list(self._anims_map.values())[0]
+        anims = []
+        for a in anim_tpl:
+            anims.append({
+                'name': a['name'],
+                'keyframes': [topmost_bone.matrix_basis] * len(a['keyframes'])
+            })
+        topmost_bone.animations = anims
+        topmost_bone.children = self.parse_bones(second_level_bones)
+        self.bones = [topmost_bone]
 
     def __fake_keyframe(self):
         return Matrix.Identity(4)
@@ -66,13 +82,6 @@ class Armature(object):
                 continue
             new_bone = Bone(blender_data=b)
             new_bone.index = self.current_bone_index
-            if not b.parent:
-                new_bone.matrix_basis = Matrix((
-                    (0.0, 0.0, -1.0, 0.0),
-                    (-1.0, 0.0, 0.0, 0.0),
-                    (0.0, 1.0, 0.0, 0.0),
-                    (0.0, 0.0, 0.0, 1.0),
-                ))
             self.current_bone_index += 1
             new_bone.animations = self._anims_map.get(b.name, [])
             new_bone.setup_matrix()
