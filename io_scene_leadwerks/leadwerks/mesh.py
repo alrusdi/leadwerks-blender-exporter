@@ -94,7 +94,9 @@ class Mesh(object):
         # Mirroring mesh by Z axis to match Leadwerks coordinate system
         trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
         if self.armature:
-            mesh.transform(trans * self.blender_data.matrix_world.copy() * Matrix.Rotation(-1.5707963267948966, 4, 'X'))
+            trans = trans * self.blender_data.matrix_world.copy().inverted()
+            trans = trans * Matrix.Rotation(-1.5707963267948966, 4, 'X') * Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
+            mesh.transform(trans)
         else:
             mesh.transform(utils.mtx_mesh * trans)
 

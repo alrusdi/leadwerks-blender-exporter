@@ -20,7 +20,12 @@ class Bone(object):
             (0.0, 0.0, 1.0, 0.0),
             (0.0, -1.0, 0.0, 0.0),
             (0.0, 0.0, 0.0, 1.0),
-        ))
+        )) * Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
+
+        self.matrix_basis = utils.magick_convert(self.matrix_basis)
+
+        print(self.matrix_basis)
+
 
         if blender_data:
             self.blender_data = blender_data
