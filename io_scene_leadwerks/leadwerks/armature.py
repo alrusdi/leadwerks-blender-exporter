@@ -24,9 +24,6 @@ class Bone(object):
 
         self.matrix_basis = utils.magick_convert(self.matrix_basis)
 
-        print(self.matrix_basis)
-
-
         if blender_data:
             self.blender_data = blender_data
             self.name = blender_data.name
