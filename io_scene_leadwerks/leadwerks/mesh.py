@@ -91,14 +91,12 @@ class Mesh(object):
             materials.append(Material(blender_data=m))
 
         mesh = utils.triangulate_mesh(mesh)
-        # Mirroring mesh by Z axis to match Leadwerks coordinate system
+        
+        # Transforming the mesh to match Leadwerks coordinate system
         trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
-        if self.armature:
-            trans = trans * self.blender_data.matrix_world.copy().inverted()
-            trans = trans * Matrix.Rotation(-1.5707963267948966, 4, 'X') * Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
-            mesh.transform(trans)
-        else:
-            mesh.transform(utils.mtx_mesh * trans)
+        trans = trans * self.blender_data.matrix_world.copy().inverted()
+        trans = trans * Matrix.Rotation(-1.5707963267948966, 4, 'X') * Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
+        mesh.transform(trans)
 
         self.triangulated_mesh = mesh
 
