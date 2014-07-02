@@ -101,11 +101,12 @@ class Mesh(object):
         self.triangulated_mesh = mesh
 
         verts = {}
+        mesh.calc_normals_split()
         for vert in mesh.vertices:
             verts[str(vert.index)] = {
                 'position': utils.to_str_list(list(vert.co)),
                 'normals': utils.to_str_list(
-                    [vert.normal.x, vert.normal.y, vert.normal.z]
+                    [-vert.normal.x, -vert.normal.y, -vert.normal.z]
                 ),
                 'bone_indexes': ['1', '1', '1', '1'],
                 'bone_weights': ['255', '0', '0', '0'],
@@ -119,6 +120,9 @@ class Mesh(object):
                     ic.append([uv[0], 1 - uv[1]])
                 tcoords[str(face_idx)] = list(map(utils.to_str_list, ic))
             break
+
+
+
 
         faces_map = {}
         verts_by_tc = {}
@@ -140,6 +144,7 @@ class Mesh(object):
                     hash = '%s_%s' % (vert_idx, '_'.join(icoords))
 
                     v = verts.get(vert_idx)
+
                     if v.get('texture_coords'):
                         has_texture_coords = True
                         hash = '%s_%s' % (vert_idx, '_'.join(coords[vpos]))
@@ -270,5 +275,5 @@ class Mesh(object):
                 if self.is_animated:
                     m.is_animated = True
                 self.materials[m.name] = m
-
+        bpy.data.meshes.remove(mesh)
         return surfaces
