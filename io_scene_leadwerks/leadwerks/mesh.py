@@ -69,8 +69,8 @@ class Mesh(object):
             else:
                 # Default value for non weight painted vertex
                 # This vertex will just follow bone in first available group
-                print('Fallback for', v.index)
-                iws[0][1] = 255
+                # print('Fallback for', v.index, iws)
+                iws = [[bone_index, 255]]
 
             weights[str(v.index)] = iws
 
@@ -94,7 +94,8 @@ class Mesh(object):
         
         # Transforming the mesh to match Leadwerks coordinate system
         trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
-        trans = trans * self.blender_data.matrix_world.copy().inverted()
+        if self.armature:
+            trans = trans * self.blender_data.matrix_world.copy().inverted()
         trans = trans * Matrix.Rotation(-1.5707963267948966, 4, 'X') * Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
         mesh.transform(trans)
 
