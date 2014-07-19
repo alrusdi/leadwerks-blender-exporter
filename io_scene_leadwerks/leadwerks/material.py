@@ -80,7 +80,7 @@ class Material(object):
 
         self.diffuse = '%s,1.0' % ','.join(map(str, self.blender_data.diffuse_color))
         if CONFIG.export_specular_color:
-            self.specular = '%s,1.0' % ','.join(map('str', self.blender_data.specular_color))
+            self.specular = '%s,1.0' % ','.join(map(str, self.blender_data.specular_color))
 
 
     def save(self, base_dir, save_textures=True):
