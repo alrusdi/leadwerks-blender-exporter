@@ -27,7 +27,7 @@ class Mesh(object):
         # Getting first available Armature of object
         # No multiple armatures supported
         for mod in self.blender_data.modifiers:
-            if mod.type == 'ARMATURE' and mod.object:
+            if mod.type == 'ARMATURE' and mod.object and mod.object.animation_data:
                 return Armature(mod.object, self.blender_data)
 
     def parse_bone_weights(self, mesh):
