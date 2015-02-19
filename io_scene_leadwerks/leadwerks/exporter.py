@@ -60,7 +60,7 @@ class LeadwerksExporter(object):
         context = {
             'code': constants.MDL_FILE,
             'version': CONFIG.file_version,
-            'childs': self.format_block(e, is_topmost=True)
+            'childs': self.format_block(e)
         }
         res = templates.render('FILE', context)
 
@@ -79,21 +79,12 @@ class LeadwerksExporter(object):
         cc = compiler.MdlCompiler(res, out_path)
         cc.compile()
 
-    def get_topmost_matrix(self, exportable):
-        obj = exportable['object']
-        mtx = obj.matrix_world.copy()
-        mtx = utils.convert_to_lw_matrix(mtx)
-        return mtx
-
-    def format_block(self, exportable, is_topmost=False):
-        if is_topmost:
-            matrix = self.get_topmost_matrix(exportable)
+    def format_block(self, exportable):
+        if not exportable['parent']:
+            matrix = exportable['object'].matrix_world.copy()
         else:
             matrix = exportable['object'].matrix_local.copy()
-            #matrix.transpose()
-            #matrix = utils.magick_convert(matrix)
-            matrix = utils.convert_to_lw_matrix(matrix)
-
+        matrix = utils.convert_to_lw_matrix(matrix)
         if exportable['type'] == 'MESH':
             return self.format_mesh(exportable, matrix)
         else:
@@ -141,11 +132,13 @@ class LeadwerksExporter(object):
                     item = {
                         'type': 'MESH',
                         'object': ob,
+                        'parent': target
                     }
             else:
                 item = {
                     'type': 'NODE',
                     'object': ob,
+                    'parent': target
                 }
             item['children'] = self.get_exportables(ob)
             exportables.append(item)

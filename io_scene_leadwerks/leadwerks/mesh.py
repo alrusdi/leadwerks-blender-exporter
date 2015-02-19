@@ -94,9 +94,11 @@ class Mesh(object):
         
         # Transforming the mesh to match Leadwerks coordinate system
         trans = Matrix.Scale(-1, 4, Vector((0.0, 0.0, 1.0)))
+        mul = 1
         if self.armature:
-            trans = trans * self.blender_data.matrix_world.copy().inverted()
-        trans = trans * Matrix.Rotation(-1.5707963267948966, 4, 'X') * Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
+            mul = 2
+            trans = trans * self.blender_data.matrix_local.copy().inverted()
+        trans = trans * Matrix.Rotation(-1.5707963267948966, 4, 'X') * Matrix.Rotation(1.5707963267948966 * mul, 4, 'Z')
         mesh.transform(trans)
 
         self.triangulated_mesh = mesh

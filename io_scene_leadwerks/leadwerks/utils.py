@@ -1,3 +1,4 @@
+import math
 import bpy
 import bmesh
 from mathutils import Matrix, Vector, Euler
@@ -65,29 +66,70 @@ def triangulate_mesh(meshable_obj):
         bpy.ops.object.editmode_toggle()
     return mesh
 
+class Scale():
+    x = 1.0
+    y = 1.0
+    z = 1.0
+
+    def __init__(self, vec):
+        self.x = vec[1]
+        self.y = vec[2]
+        self.z = vec[0]
+
+class Rot():
+    x = 1.0
+    y = 1.0
+    z = 1.0
+    w = 1.0
+
+    def __init__(self, vec):
+        self.x = vec[1]
+        self.y = vec[0]
+        self.z = vec[2]
+        self.w = -vec[3]
+
 def convert_to_lw_matrix(mtx):
-    pos, rot, scale = mtx.decompose()
+    mtx = mtx * Matrix.Rotation(1.5707963267948966*2, 4, 'Z')
+    pos, rot, rscale = mtx.decompose()
+    rrot = mtx.to_quaternion()
 
-    mat_trans = Matrix.Translation(Vector((pos[1], pos[2], pos[0]))).to_4x4()
-    eul = rot.to_euler('XYZ')
+    scale = Scale(rscale)
+    rot = Rot(rrot)
 
-    mat_rot = Euler((eul[2], eul[0], -eul[1]), 'XYZ').to_matrix().to_4x4()
+    xx = rot.x * rot.x
+    yy = rot.y * rot.y
+    zz = rot.z * rot.z
+    xy = rot.x * rot.y
+    xz = rot.x * rot.z
+    yz = rot.y * rot.z
+    wx = rot.w * rot.x
+    wy = rot.w * rot.y
+    wz = rot.w * rot.z
 
-    mat_scale = Matrix.Identity(4)
-    mat_scale[0][0] = scale[0]
-    mat_scale[1][1] = scale[1]
-    mat_scale[2][2] = scale[2]
+    ret = []
 
-    mtx = Matrix.Identity(4) * mat_scale
-    mtx = mtx * mat_rot
-    mtx = mtx * mat_trans
+    ret.append([
+        (1.0 - 2.0 * ( yy + zz )) * scale.x,
+        (2.0 * ( xy - wz )) * scale.x,
+        (2.0 * ( xz + wy )) * scale.x,
+        0.0,
+    ])
 
-    mtx[3][0] = -mtx[0][3]
-    mtx[3][1] = mtx[1][3]
-    mtx[3][2] = mtx[2][3]
+    ret.append([
+        (2.0 * ( xy + wz )) * scale.y,
+        (1.0 - 2.0 * ( xx + zz )) * scale.y,
+        (2.0 * ( yz - wx )) * scale.y,
+        0.0,
+    ])
 
-    mtx[0][3] = 0.0
-    mtx[1][3] = 0.0
-    mtx[2][3] = 0.0
+    ret.append([
+        (2.0 * ( xz - wy )) * scale.z,
+        (2.0 * ( yz + wx )) * scale.z,
+        (1.0 - 2.0 * ( xx + yy )) * scale.z,
+        0.0,
+    ])
 
-    return mtx
+    ret.append([-pos[1], pos[2], pos[0], 1.0])
+
+    return Matrix(ret)
+

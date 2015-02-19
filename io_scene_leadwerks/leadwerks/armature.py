@@ -30,7 +30,7 @@ class Bone(object):
 
     def setup_matrix(self):
         if self.animations:
-            self.matrix_basis = self.animations[0]['keyframes'][0]
+            self.matrix_basis = self.animations[-1]['keyframes'][0]
 
 
 class Armature(object):
